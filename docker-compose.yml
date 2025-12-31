@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: autowriter_db
+    restart: always
+    environment:
+      POSTGRES_USER: autowriter
+      POSTGRES_PASSWORD: autowriter_password
+      POSTGRES_DB: autowriter_dashboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
