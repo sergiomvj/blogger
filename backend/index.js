@@ -24,6 +24,17 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+// --- Database Readiness Check ---
+app.use(async (req, res, next) => {
+    try {
+        await pool.query('SELECT 1');
+        next();
+    } catch (err) {
+        console.error('⚠️ Requisição bloqueada: Banco de dados inacessível.');
+        res.status(503).json({ error: 'Database Unavailable', details: err.message });
+    }
+});
+
 // --- Logger ---
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
