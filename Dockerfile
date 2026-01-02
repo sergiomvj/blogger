@@ -2,12 +2,17 @@ FROM node:20-slim
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install --production
+# Somente as dependências do BACKEND para evitar conflitos com o frontend (recharts/react)
+COPY backend/package*.json ./
 
-COPY . .
+# Usamos --legacy-peer-deps por segurança contra conflitos de peer dependencies
+RUN npm install --production --legacy-peer-deps
+
+# Copia o código do backend
+COPY backend/ ./
 
 EXPOSE 3001
 
-# Run migration and then start the server
-CMD ["sh", "-c", "npm run migrate && npm start"]
+# Executa migração e inicia o servidor
+# Usamos node diretamente para garantir que funcione sem depender de scripts do package.json se necessário
+CMD ["sh", "-c", "node migrate.js && node index.js"]

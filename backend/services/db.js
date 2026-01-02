@@ -3,16 +3,19 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+// Tenta pegar a URL única ou monta a partir das variáveis individuais do Easypanel/Docker
+const connectionConfig = process.env.DATABASE_URL || {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME || 'autowriter',
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined
+};
 
-// Parse the URL to get connection details if it's a string
-// mysql2 supports connection strings for some methods, but manually parsing is safer for cross-compat
-export const pool = mysql.createPool(dbUrl);
+export const pool = mysql.createPool(connectionConfig);
 
-// Test connection
-try {
-    await pool.query('SELECT 1');
-    console.log('Database connected successfully.');
-} catch (err) {
-    console.error('Database connection failed:', err.message);
-}
+// Teste de conexão silencioso
+pool.query('SELECT 1').catch(err => {
+    console.error('❌ Database connection failed:', err.message);
+});
