@@ -182,7 +182,11 @@ app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
 });
 
 // --- Serve Frontend Assets ---
-const distPath = path.resolve(__dirname, '../dist');
+// Resiliente para Local (../dist) e Docker (./dist)
+let distPath = path.resolve(__dirname, 'dist');
+if (!fs.existsSync(path.join(distPath, 'index.html'))) {
+    distPath = path.resolve(__dirname, '../dist');
+}
 console.log(`[FILESYSTEM] Mapeando Dashboard em: ${distPath}`);
 app.use(express.static(distPath));
 
