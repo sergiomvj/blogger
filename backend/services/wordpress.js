@@ -1,13 +1,13 @@
 import axios from 'axios';
 import crypto from 'crypto';
 
-export async function publishToWP(jobId, jobData, artifacts) {
-    const wpUrl = process.env.WP_API_URL;
-    const wpPassword = process.env.WP_APP_PASSWORD;
-    const hmacSecret = process.env.HMAC_SECRET;
+export async function publishToWP(jobId, jobData, artifacts, blogCredentials = null) {
+    const wpUrl = blogCredentials?.api_url || process.env.WP_API_URL;
+    const wpPassword = blogCredentials?.auth_credentials?.password || process.env.WP_APP_PASSWORD;
+    const hmacSecret = process.env.HMAC_SECRET || 'dev-secret';
 
     if (!wpUrl || !wpPassword) {
-        throw new Error('WP credentials not configured');
+        throw new Error('WP credentials not found for blog: ' + (jobData.blog_key || 'default'));
     }
 
     // Build the payload as expected by the class-autowriter-rest.php

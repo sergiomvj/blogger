@@ -22,7 +22,7 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3001;
 
 // --- Logger ---
 app.use((req, res, next) => {
@@ -32,12 +32,6 @@ app.use((req, res, next) => {
 
 // --- Health Check (Sempre disponível) ---
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
-
-// --- Serve Frontend Assets (Sempre disponível) ---
-const distPath = path.join(__dirname, 'dist');
-console.log(`[FILESYSTEM] Mapeando Dashboard em: ${distPath}`);
-
-app.use(express.static(distPath));
 
 // --- Database Readiness Check (Somente para API) ---
 const dbCheck = async (req, res, next) => {
@@ -187,6 +181,11 @@ app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
     }
 });
 
+// --- Serve Frontend Assets ---
+const distPath = path.resolve(__dirname, '../dist');
+console.log(`[FILESYSTEM] Mapeando Dashboard em: ${distPath}`);
+app.use(express.static(distPath));
+
 // --- Pipeline Runner ---
 
 async function processBatchBackground(batchId) {
@@ -277,7 +276,7 @@ async function runJobPipeline(job) {
 
         // Final Step: Publication
         await update('T10', 95);
-        const result = await publishToWP(jobId, job, artifacts);
+        const result = await publishToWP(jobId, job, artifacts, blogData[0]);
 
         await pool.query('UPDATE jobs SET status = \'published\', wp_post_id = ?, wp_post_url = ?, progress = 100 WHERE id = ?',
             [result.post_id, result.post_url, jobId]);

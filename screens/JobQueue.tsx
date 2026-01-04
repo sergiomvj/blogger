@@ -84,83 +84,81 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
             <h2 className="text-base font-bold">Active & Issues</h2>
             <button className="text-xs font-medium text-primary">View All</button>
           </div>
-          {jobs.filter(j => ['Running', 'Failed', 'Needs Review'].includes(j.status)).map(job => (
-            <div
-              key={job.id}
-              onClick={() => onNavigate(Screen.JOB_DETAILS, job.id)}
-              className="flex flex-col gap-3 rounded-xl bg-surface-dark p-4 shadow-sm ring-1 ring-white/5 transition-all hover:bg-surface-darker cursor-pointer"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className={`size-10 shrink-0 flex items-center justify-center rounded-lg ${job.status === 'Running' ? 'bg-primary/20 text-primary' :
-                    job.status === 'Failed' ? 'bg-rose-500/20 text-rose-500' : 'bg-amber-500/20 text-amber-500'
-                    }`}>
-                    <span className="material-symbols-outlined">{job.icon}</span>
+          <div className="grid grid-cols-2 gap-3">
+            {jobs.filter(j => ['Running', 'Failed', 'Needs Review'].includes(j.status)).map(job => (
+              <div
+                key={job.id}
+                onClick={() => onNavigate(Screen.JOB_DETAILS, job.id)}
+                className="flex flex-col gap-3 rounded-xl bg-surface-dark p-3 shadow-sm ring-1 ring-white/5 transition-all hover:bg-surface-darker cursor-pointer h-full"
+              >
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className={`size-8 shrink-0 flex items-center justify-center rounded-lg ${job.status === 'Running' ? 'bg-primary/20 text-primary' :
+                      job.status === 'Failed' ? 'bg-rose-500/20 text-rose-500' : 'bg-amber-500/20 text-amber-500'
+                      }`}>
+                      <span className="material-symbols-outlined text-[18px]">{job.icon}</span>
+                    </div>
+                    <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-medium ${job.status === 'Running' ? 'bg-primary/10 text-primary' :
+                      job.status === 'Failed' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
+                      }`}>
+                      {job.status}
+                    </span>
                   </div>
-                  <div className="flex-col">
-                    <h3 className="text-sm font-semibold truncate max-w-[180px]">{job.title}</h3>
-                    <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">public</span> {job.site}
-                      </span>
-                      <span className="h-1 w-1 rounded-full bg-slate-600"></span>
-                      <span>{job.category}</span>
+                  <div className="min-w-0">
+                    <h3 className="text-xs font-semibold truncate text-white">{job.title}</h3>
+                    <div className="mt-1 flex items-center gap-1.5 text-[9px] text-slate-400">
+                      <span className="truncate max-w-[60px]">{job.site}</span>
+                      <span className="h-0.5 w-0.5 rounded-full bg-slate-600 shrink-0"></span>
+                      <span className="truncate">{job.category}</span>
                     </div>
                   </div>
                 </div>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${job.status === 'Running' ? 'bg-primary/10 text-primary' :
-                  job.status === 'Failed' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
-                  }`}>
-                  {job.status}
-                </span>
-              </div>
-              {job.status === 'Running' && (
-                <div className="mt-1 flex items-center gap-3">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-700">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${job.progress}%` }}></div>
+                {job.status === 'Running' && (
+                  <div className="mt-auto flex items-center gap-2">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-700">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${job.progress}%` }}></div>
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-400">{job.progress}%</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-300">{job.progress}%</span>
-                </div>
-              )}
-              {job.status === 'Failed' && (
-                <div className="mt-1 flex justify-end">
-                  <button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-lg shadow-primary/20">
-                    <span className="material-symbols-outlined text-[16px]">replay</span>
-                    Retry Job
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+                {job.status === 'Failed' && (
+                  <div className="mt-auto">
+                    <button className="w-full flex items-center justify-center gap-1 rounded-lg bg-primary/20 p-1.5 text-[10px] font-bold text-primary">
+                      <span className="material-symbols-outlined text-[14px]">replay</span>
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 pb-20">
           <h2 className="text-base font-bold">Recent History</h2>
-          {jobs.filter(j => ['Published', 'Queued'].includes(j.status)).map(job => (
-            <div key={job.id} className="flex flex-col gap-3 rounded-xl bg-surface-dark p-4 ring-1 ring-white/5 opacity-80">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="size-10 shrink-0 flex items-center justify-center rounded-lg bg-slate-700/50 text-slate-400">
-                    <span className="material-symbols-outlined">{job.icon}</span>
+          <div className="grid grid-cols-2 gap-3">
+            {jobs.filter(j => ['Published', 'Queued'].includes(j.status)).map(job => (
+              <div
+                key={job.id}
+                className="flex flex-col gap-2 rounded-xl bg-surface-dark p-3 ring-1 ring-white/5 opacity-80 h-full"
+                onClick={() => onNavigate(Screen.JOB_DETAILS, job.id)}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="size-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-700/50 text-slate-400">
+                    <span className="material-symbols-outlined text-[18px]">{job.icon}</span>
                   </div>
-                  <div className="flex flex-col">
-                    <h3 className="text-sm font-semibold truncate max-w-[180px]">{job.title}</h3>
-                    <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px]">public</span> {job.site}
-                      </span>
-                      <span className="h-1 w-1 rounded-full bg-slate-600"></span>
-                      <span>{job.category}</span>
-                    </div>
-                  </div>
+                  <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-medium ${job.status === 'Published' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/50 text-slate-400'
+                    }`}>
+                    {job.status}
+                  </span>
                 </div>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${job.status === 'Published' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/50 text-slate-400'
-                  }`}>
-                  {job.status}
-                </span>
+                <div className="min-w-0">
+                  <h3 className="text-xs font-semibold truncate text-white">{job.title}</h3>
+                  <p className="text-[9px] text-slate-500 truncate mt-0.5">{job.site} • {job.category}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </main>
 
