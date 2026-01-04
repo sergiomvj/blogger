@@ -134,6 +134,16 @@ const sqls = [
     UNIQUE (job_id, revision, profile_key),
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
     FOREIGN KEY (profile_key) REFERENCES pricing_profiles(profile_key) ON DELETE RESTRICT
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS settings (
+    id INT PRIMARY KEY DEFAULT 1,
+    openai_api_key TEXT,
+    anthropic_api_key TEXT,
+    stability_api_key TEXT,
+    google_api_key TEXT,
+    image_mode VARCHAR(50) DEFAULT 'dalle3',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`
 ];
 

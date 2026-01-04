@@ -28,6 +28,16 @@ export const api = {
         return res.json();
     },
 
+    async getJobById(id: string): Promise<Job> {
+        const res = await fetch(`${API_BASE}/jobs/${id}`);
+        return res.json();
+    },
+
+    async getJobArtifacts(id: string) {
+        const res = await fetch(`${API_BASE}/jobs/${id}/artifacts`);
+        return res.json();
+    },
+
     async uploadCSV(data: FormData) {
         const res = await fetch(`${API_BASE}/upload`, {
             method: 'POST',

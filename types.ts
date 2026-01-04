@@ -9,7 +9,7 @@ export enum Screen {
   BLOGS = 'BLOGS'
 }
 
-export type JobStatus = 'Running' | 'Failed' | 'Needs Review' | 'Published' | 'Queued' | 'Processing';
+export type JobStatus = 'Running' | 'Failed' | 'Needs Review' | 'Published' | 'Queued' | 'Processing' | 'processing' | 'failed' | 'published' | 'queued' | 'review';
 
 export interface Job {
   id: string;
@@ -20,6 +20,9 @@ export interface Job {
   progress?: number;
   timestamp: string;
   icon?: string;
+  wp_post_id?: string | number;
+  wp_post_url?: string;
+  last_error?: string;
 }
 
 export interface Stat {

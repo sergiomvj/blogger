@@ -122,6 +122,60 @@ app.post('/api/blogs/:id/sync', dbCheck, async (req, res) => {
     }
 });
 
+// --- Settings Endpoints ---
+app.get('/api/settings', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM settings WHERE id = 1');
+        if (rows.length === 0) {
+            // Se não existe, cria com valores default
+            await pool.query('INSERT INTO settings (id) VALUES (1)');
+            return res.json({});
+        }
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/settings', dbCheck, async (req, res) => {
+    const { openai_api_key, anthropic_api_key, stability_api_key, image_mode } = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO settings (id, openai_api_key, anthropic_api_key, stability_api_key, image_mode) 
+             VALUES (1, ?, ?, ?, ?) 
+             ON DUPLICATE KEY UPDATE 
+                openai_api_key = VALUES(openai_api_key),
+                anthropic_api_key = VALUES(anthropic_api_key),
+                stability_api_key = VALUES(stability_api_key),
+                image_mode = VALUES(image_mode)`,
+            [openai_api_key, anthropic_api_key, stability_api_key, image_mode]
+        );
+        res.json({ message: 'Settings saved' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Job Endpoints ---
+app.get('/api/jobs/:id', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Job not found' });
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/jobs/:id/artifacts', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT task, json_data, created_at FROM job_artifacts WHERE job_id = ? ORDER BY created_at ASC', [req.params.id]);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -191,12 +245,31 @@ console.log(`[FILESYSTEM] Mapeando Dashboard em: ${distPath}`);
 app.use(express.static(distPath));
 
 // --- Pipeline Runner ---
+// Usando um semáforo manual para evitar sobrecarregar a API de LLM (max 3 jobs simultâneos)
+let activeJobs = 0;
+const jobQueue = [];
 
 async function processBatchBackground(batchId) {
     const [jobs] = await pool.query('SELECT * FROM jobs WHERE batch_id = ?', [batchId]);
     for (const job of jobs) {
-        runJobPipeline(job);
+        jobQueue.push(job);
     }
+    processNextInQueue();
+}
+
+async function processNextInQueue() {
+    if (activeJobs >= 3 || jobQueue.length === 0) return;
+
+    activeJobs++;
+    const job = jobQueue.shift();
+
+    runJobPipeline(job).finally(() => {
+        activeJobs--;
+        processNextInQueue();
+    });
+
+    // Tenta rodar outro se houver slots
+    processNextInQueue();
 }
 
 async function runJobPipeline(job) {
@@ -315,7 +388,17 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 Backend is loud and clear on port ${PORT}`);
     console.log(`DASHBOARD: ${distPath}`);
+
+    // Cleanup: Reset jobs that were 'processing' when server shut down
+    try {
+        const [result] = await pool.query('UPDATE jobs SET status = \'failed\', last_error = \'Servidor reiniciado durante o processamento\' WHERE status = \'processing\'');
+        if (result.affectedRows > 0) {
+            console.log(`[CLEANUP] ${result.affectedRows} jobs resetados de 'processing' para 'failed'.`);
+        }
+    } catch (err) {
+        console.error('[CLEANUP ERR]', err.message);
+    }
 });
