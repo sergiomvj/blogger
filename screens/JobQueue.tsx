@@ -48,7 +48,10 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
           <button onClick={fetchJobs} className="size-10 flex items-center justify-center rounded-full text-white hover:bg-white/10">
             <span className={`material-symbols-outlined ${loading ? 'animate-spin' : ''}`}>refresh</span>
           </button>
-          <h1 className="text-lg font-bold">Job Queue</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold">Job Queue</h1>
+            <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-slate-400">v1.0.2</span>
+          </div>
           <button className="size-10 flex items-center justify-center rounded-full text-white hover:bg-white/10">
             <span className="material-symbols-outlined">filter_list</span>
           </button>
@@ -89,26 +92,26 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
               <div
                 key={job.id}
                 onClick={() => onNavigate(Screen.JOB_DETAILS, job.id)}
-                className="flex flex-col gap-3 rounded-xl bg-surface-dark p-3 shadow-sm ring-1 ring-white/5 transition-all hover:bg-surface-darker cursor-pointer h-full"
+                className="relative flex flex-col gap-3 rounded-xl bg-surface-dark p-3 shadow-sm ring-1 ring-white/5 transition-all hover:bg-surface-darker cursor-pointer h-full min-w-0"
               >
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 min-w-0">
+                  <div className="flex items-center justify-between min-w-0">
                     <div className={`size-8 shrink-0 flex items-center justify-center rounded-lg ${job.status === 'Running' ? 'bg-primary/20 text-primary' :
                       job.status === 'Failed' ? 'bg-rose-500/20 text-rose-500' : 'bg-amber-500/20 text-amber-500'
                       }`}>
                       <span className="material-symbols-outlined text-[18px]">{job.icon}</span>
                     </div>
-                    <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-medium ${job.status === 'Running' ? 'bg-primary/10 text-primary' :
+                    <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${job.status === 'Running' ? 'bg-primary/10 text-primary' :
                       job.status === 'Failed' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
                       }`}>
                       {job.status}
                     </span>
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="text-xs font-semibold truncate text-white">{job.title}</h3>
-                    <div className="mt-1 flex items-center gap-1.5 text-[9px] text-slate-400">
-                      <span className="truncate max-w-[60px]">{job.site}</span>
-                      <span className="h-0.5 w-0.5 rounded-full bg-slate-600 shrink-0"></span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-xs font-bold truncate text-white leading-tight">{job.title}</h3>
+                    <div className="mt-1 flex items-center gap-1 text-[9px] text-slate-500">
+                      <span className="truncate max-w-[50%]">{job.site}</span>
+                      <span className="h-0.5 w-0.5 rounded-full bg-slate-700 shrink-0"></span>
                       <span className="truncate">{job.category}</span>
                     </div>
                   </div>
