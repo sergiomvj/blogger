@@ -63,8 +63,10 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen w-full lg:max-w-5xl mx-auto bg-background-dark relative border-x border-white/5 shadow-2xl">
-      {renderScreen()}
+    <div className="flex flex-col min-h-screen w-full lg:max-w-4xl mx-auto bg-background-dark relative md:border-x border-white/5 shadow-2xl overflow-x-hidden">
+      <div className="flex-1 flex flex-col pb-24">
+        {renderScreen()}
+      </div>
       <Navigation currentScreen={currentScreen} onNavigate={navigateTo} />
     </div>
   );
