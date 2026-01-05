@@ -176,6 +176,15 @@ app.get('/api/jobs/:id/artifacts', dbCheck, async (req, res) => {
     }
 });
 
+app.delete('/api/jobs/:id', dbCheck, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM jobs WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Job deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 

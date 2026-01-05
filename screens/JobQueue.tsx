@@ -96,11 +96,31 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
                       }`}>
                       <span className="material-symbols-outlined text-[18px]">{job.icon || 'article'}</span>
                     </div>
-                    <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${['running', 'processing', 'Running', 'Processing'].includes(job.status) ? 'bg-primary/10 text-primary' :
-                      ['failed', 'Failed'].includes(job.status) ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
-                      }`}>
-                      {job.status}
-                    </span>
+                    <div className="flex items-center gap-1.5 overflow-hidden">
+                      {['failed', 'Failed', 'review', 'Needs Review'].includes(job.status) && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm('Excluir este job?')) {
+                              try {
+                                await api.deleteJob(job.id);
+                                fetchJobs();
+                              } catch (err) {
+                                alert('Erro ao excluir job');
+                              }
+                            }
+                          }}
+                          className="size-6 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 active:scale-90 transition-all"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">delete</span>
+                        </button>
+                      )}
+                      <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-tighter ${['running', 'processing', 'Running', 'Processing'].includes(job.status) ? 'bg-primary/10 text-primary' :
+                        ['failed', 'Failed'].includes(job.status) ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
+                        {job.status}
+                      </span>
+                    </div>
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="text-xs font-bold truncate text-white leading-tight">{job.title || 'Sem Título'}</h3>

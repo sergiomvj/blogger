@@ -38,6 +38,11 @@ export const api = {
         return res.json();
     },
 
+    async deleteJob(id: string) {
+        const res = await fetch(`${API_BASE}/jobs/${id}`, { method: 'DELETE' });
+        return res.json();
+    },
+
     async uploadCSV(data: FormData) {
         const res = await fetch(`${API_BASE}/upload`, {
             method: 'POST',
