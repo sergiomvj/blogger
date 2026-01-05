@@ -56,11 +56,23 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
 
   return (
     <div className="flex flex-col h-screen bg-background-dark pb-24">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-background-dark sticky top-0 z-20">
-        <button onClick={() => onNavigate(Screen.DASHBOARD)} className="size-10 flex items-center justify-center rounded-full hover:bg-white/10">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-background-dark sticky top-0 z-[110] backdrop-blur-md">
+        <button onClick={() => onNavigate(Screen.DASHBOARD)} className="size-10 flex items-center justify-center rounded-full hover:bg-white/10 shrink-0">
           <span className="material-symbols-outlined">arrow_back_ios_new</span>
         </button>
-        <h1 className="text-lg font-bold flex-1 text-center pr-10">System Settings</h1>
+        <h1 className="text-base font-bold flex-1 text-center">Configurações</h1>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-primary/20 hover:bg-primary/30 text-primary px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1 transition-all active:scale-95 disabled:opacity-50 shrink-0"
+        >
+          {saving ? (
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+          ) : (
+            <span className="material-symbols-outlined text-[18px]">save</span>
+          )}
+          {saving ? 'Salvando...' : 'Salvar'}
+        </button>
       </header>
 
       <main className="flex-1 overflow-y-auto no-scrollbar pb-32">
@@ -212,22 +224,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
           </div>
         </section>
       </main>
-
-      <footer className="fixed bottom-0 left-0 right-0 bg-background-dark border-t border-white/5 p-4 pb-8 z-20 max-w-md mx-auto">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full bg-primary hover:bg-blue-600 text-white font-semibold text-base py-3.5 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-        >
-          {saving ? (
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-          ) : (
-            <span className="material-symbols-outlined">save</span>
-          )}
-          {saving ? 'Saving...' : 'Save Configuration'}
-        </button>
-      </footer>
-    </div >
+    </div>
   );
 };
 
