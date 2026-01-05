@@ -17,6 +17,10 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
     stability_api_key: 'sk-stability-key-123',
     image_mode: 'dalle3',
     base_prompt: '',
+    use_llm_strategy: true,
+    provider_openai_enabled: true,
+    provider_anthropic_enabled: true,
+    provider_google_enabled: true,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,9 +54,10 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setSettings(prev => ({ ...prev, [field]: value }));
   };
+
 
   return (
     <div className="flex flex-col h-screen bg-background-dark pb-24">
@@ -146,6 +151,57 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
                   Use os marcadores <code className="text-primary">{`{blog_style}`}</code>, <code className="text-primary">{`{article_style}`}</code> e <code className="text-primary">{`{language}`}</code> para injeção dinâmica.
                 </p>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="h-px bg-white/5 mx-4 my-2"></div>
+
+        <section className="px-4 pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">LLM Routing</h3>
+            <span className="text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded">Fallback Engine</span>
+          </div>
+
+          <div className="bg-surface-dark border border-white/5 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white">Usar LLM Strategy</span>
+                <span className="text-[10px] text-slate-400">Tenta modelos alternativos se o principal falhar</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={!!settings.use_llm_strategy}
+                  onChange={(e) => handleInputChange('use_llm_strategy', e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+            </div>
+
+            <div className="h-px bg-white/5 my-4"></div>
+
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-3">Provedores Habilitados</p>
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { id: 'provider_openai_enabled', label: 'OpenAI (GPT-4o, etc)', icon: 'bolt' },
+                { id: 'provider_anthropic_enabled', label: 'Anthropic (Claude)', icon: 'auto_awesome' },
+                { id: 'provider_google_enabled', label: 'Google (Gemini)', icon: 'google' }
+              ].map((prov) => (
+                <div key={prov.id} className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-slate-400 text-[18px]">{prov.icon}</span>
+                    <span className="text-xs text-slate-300">{prov.label}</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-primary focus:ring-primary focus:ring-offset-slate-900"
+                    checked={!!(settings as any)[prov.id]}
+                    onChange={(e) => handleInputChange(prov.id, e.target.checked)}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </section>

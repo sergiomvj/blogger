@@ -11,10 +11,37 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 export async function callLLM(task, jobId, context) {
     const language = context.language || 'pt';
-    const models = ROUTER_CONFIG.models[task];
+    let models = ROUTER_CONFIG.models[task];
+
+    // Fetch settings to check strategy
+    let settingsData = {
+        use_llm_strategy: 1,
+        provider_openai_enabled: 1,
+        provider_anthropic_enabled: 1,
+        provider_google_enabled: 1
+    };
+    try {
+        const [rows] = await pool.query('SELECT use_llm_strategy, provider_openai_enabled, provider_anthropic_enabled, provider_google_enabled FROM settings WHERE id = 1');
+        if (rows[0]) settingsData = rows[0];
+    } catch (err) {
+        console.warn('Failed to fetch strategy settings:', err.message);
+    }
+
+    // Filter models based on enabled providers
+    models = models.filter(m => {
+        if (m.model.startsWith('openai/') && !settingsData.provider_openai_enabled) return false;
+        if (m.model.startsWith('anthropic/') && !settingsData.provider_anthropic_enabled) return false;
+        if (m.model.startsWith('google/') && !settingsData.provider_google_enabled) return false;
+        return true;
+    });
 
     if (!models || models.length === 0) {
-        throw new Error(`No models configured for task: ${task}`);
+        throw new Error(`No enabled models configured for task: ${task}`);
+    }
+
+    // If strategy is OFF, only use the first one
+    if (!settingsData.use_llm_strategy) {
+        models = [models[0]];
     }
 
     let lastError = null;

@@ -138,18 +138,33 @@ app.get('/api/settings', dbCheck, async (req, res) => {
 });
 
 app.post('/api/settings', dbCheck, async (req, res) => {
-    const { openai_api_key, anthropic_api_key, stability_api_key, image_mode, base_prompt } = req.body;
+    const {
+        openai_api_key, anthropic_api_key, stability_api_key, image_mode, base_prompt,
+        use_llm_strategy, provider_openai_enabled, provider_anthropic_enabled, provider_google_enabled
+    } = req.body;
     try {
         await pool.query(
-            `INSERT INTO settings (id, openai_api_key, anthropic_api_key, stability_api_key, image_mode, base_prompt) 
-             VALUES (1, ?, ?, ?, ?, ?) 
+            `INSERT INTO settings (
+                id, openai_api_key, anthropic_api_key, stability_api_key, 
+                image_mode, base_prompt, use_llm_strategy, 
+                provider_openai_enabled, provider_anthropic_enabled, provider_google_enabled
+            ) 
+             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
              ON DUPLICATE KEY UPDATE 
                 openai_api_key = VALUES(openai_api_key),
                 anthropic_api_key = VALUES(anthropic_api_key),
                 stability_api_key = VALUES(stability_api_key),
                 image_mode = VALUES(image_mode),
-                base_prompt = VALUES(base_prompt)`,
-            [openai_api_key, anthropic_api_key, stability_api_key, image_mode, base_prompt]
+                base_prompt = VALUES(base_prompt),
+                use_llm_strategy = VALUES(use_llm_strategy),
+                provider_openai_enabled = VALUES(provider_openai_enabled),
+                provider_anthropic_enabled = VALUES(provider_anthropic_enabled),
+                provider_google_enabled = VALUES(provider_google_enabled)`,
+            [
+                openai_api_key, anthropic_api_key, stability_api_key,
+                image_mode, base_prompt, use_llm_strategy,
+                provider_openai_enabled, provider_anthropic_enabled, provider_google_enabled
+            ]
         );
         res.json({ message: 'Settings saved' });
     } catch (err) {
