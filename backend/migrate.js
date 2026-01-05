@@ -30,6 +30,7 @@ const sqls = [
     name TEXT,
     site_url TEXT,
     api_url TEXT,
+    hmac_secret TEXT,
     auth_credentials JSON,
     categories_json JSON,
     authors_json JSON,
@@ -139,10 +140,16 @@ const sqls = [
   `CREATE TABLE IF NOT EXISTS settings (
     id INT PRIMARY KEY DEFAULT 1,
     openai_api_key TEXT,
+    openrouter_api_key TEXT,
     anthropic_api_key TEXT,
     stability_api_key TEXT,
     google_api_key TEXT,
     image_mode VARCHAR(50) DEFAULT 'dalle3',
+    base_prompt TEXT,
+    use_llm_strategy TINYINT(1) DEFAULT 1,
+    provider_openai_enabled TINYINT(1) DEFAULT 1,
+    provider_anthropic_enabled TINYINT(1) DEFAULT 1,
+    provider_google_enabled TINYINT(1) DEFAULT 1,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`
 ];

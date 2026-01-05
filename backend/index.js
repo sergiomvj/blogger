@@ -76,15 +76,40 @@ app.get('/api/blogs', dbCheck, async (req, res) => {
 });
 
 app.post('/api/blogs', dbCheck, async (req, res) => {
-    const { blog_key, blog_id, site_url, api_url, application_password } = req.body;
+    const { blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, application_password } = req.body;
     try {
         const id = uuidv4();
         const auth = { type: 'application_password', password: application_password };
         await pool.query(
-            'INSERT INTO blogs (id, blog_key, blog_id, site_url, api_url, auth_credentials) VALUES (?, ?, ?, ?, ?, ?)',
-            [id, blog_key, blog_id, site_url, api_url, JSON.stringify(auth)]
+            'INSERT INTO blogs (id, blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, auth_credentials) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, blog_key, blog_id, site_url, api_url, hmac_secret, style_key || 'analitica', wp_user || 'admin', JSON.stringify(auth)]
         );
         res.json({ message: 'Blog added', id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/blogs/:id', dbCheck, async (req, res) => {
+    const { id } = req.params;
+    const { blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, application_password } = req.body;
+    try {
+        const auth = { type: 'application_password', password: application_password };
+        await pool.query(
+            'UPDATE blogs SET blog_key = ?, blog_id = ?, site_url = ?, api_url = ?, hmac_secret = ?, style_key = ?, wp_user = ?, auth_credentials = ? WHERE id = ?',
+            [blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, JSON.stringify(auth), id]
+        );
+        res.json({ message: 'Blog updated' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/blogs/:id', dbCheck, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.query('DELETE FROM blogs WHERE id = ?', [id]);
+        res.json({ message: 'Blog deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -139,19 +164,20 @@ app.get('/api/settings', dbCheck, async (req, res) => {
 
 app.post('/api/settings', dbCheck, async (req, res) => {
     const {
-        openai_api_key, anthropic_api_key, stability_api_key, image_mode, base_prompt,
+        openai_api_key, openrouter_api_key, anthropic_api_key, stability_api_key, image_mode, base_prompt,
         use_llm_strategy, provider_openai_enabled, provider_anthropic_enabled, provider_google_enabled
     } = req.body;
     try {
         await pool.query(
             `INSERT INTO settings (
-                id, openai_api_key, anthropic_api_key, stability_api_key, 
+                id, openai_api_key, openrouter_api_key, anthropic_api_key, stability_api_key, 
                 image_mode, base_prompt, use_llm_strategy, 
                 provider_openai_enabled, provider_anthropic_enabled, provider_google_enabled
             ) 
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
              ON DUPLICATE KEY UPDATE 
                 openai_api_key = VALUES(openai_api_key),
+                openrouter_api_key = VALUES(openrouter_api_key),
                 anthropic_api_key = VALUES(anthropic_api_key),
                 stability_api_key = VALUES(stability_api_key),
                 image_mode = VALUES(image_mode),
@@ -161,7 +187,7 @@ app.post('/api/settings', dbCheck, async (req, res) => {
                 provider_anthropic_enabled = VALUES(provider_anthropic_enabled),
                 provider_google_enabled = VALUES(provider_google_enabled)`,
             [
-                openai_api_key, anthropic_api_key, stability_api_key,
+                openai_api_key, openrouter_api_key, anthropic_api_key, stability_api_key,
                 image_mode, base_prompt, use_llm_strategy,
                 provider_openai_enabled, provider_anthropic_enabled, provider_google_enabled
             ]
@@ -243,7 +269,7 @@ app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
                     record.blog || 'default',
                     parseInt(record.blog_id_override) || 1,
                     record.category || 'Geral',
-                    record.article_style || record.style || 'analitico',
+                    record.article_style || record.style || 'analitica',
                     record.objective || '',
                     theme,
                     record.language || 'pt',
@@ -320,7 +346,7 @@ async function runJobPipeline(job) {
         "Estilo padrão: Neutro e informativo.";
 
     const articleStyle = artStyleData[0] ?
-        `Tipo: ${artStyleData[0].name}\nDescrição: ${artStyleData[0].description}` :
+        `Tipo: ${artStyleData[0].name}\nDescrição: ${artStyleData[0].description}\nEstrutura Desejada: ${JSON.stringify(artStyleData[0].structure_blueprint)}` :
         "Formato padrão: Artigo técnico.";
 
     const context = {
@@ -364,7 +390,7 @@ async function runJobPipeline(job) {
         await saveArtifact(jobId, 'headings', artifacts.headings);
 
         // T6: Article Body
-        await update('T6', 80);
+        await update('T6', 70);
         artifacts.article_body = await callLLM('article_body', jobId, {
             theme: context.theme_pt,
             title: artifacts.seo_title.title,
@@ -376,8 +402,36 @@ async function runJobPipeline(job) {
         });
         await saveArtifact(jobId, 'article_body', artifacts.article_body);
 
+        // T7: Tags
+        await update('T7', 75);
+        artifacts.tags = await callLLM('tags', jobId, { ...context, theme: job.theme_pt, primary_keyword: artifacts.keyword_plan.primary_keyword });
+        await saveArtifact(jobId, 'tags', artifacts.tags);
+
+        // T8: Image Prompts
+        await update('T8', 80);
+        artifacts.image_prompts = await callLLM('image_prompt', jobId, { ...context, theme: job.theme_pt, primary_keyword: artifacts.keyword_plan.primary_keyword });
+        await saveArtifact(jobId, 'image_prompt', artifacts.image_prompts);
+
+        // T9: Image Generation
+        await update('T9', 90);
+        const { generateImage } = await import('./services/images.js');
+        artifacts.images = {
+            featured: { url: await generateImage(artifacts.image_prompts.featured_prompt, 'featured', jobId), alt: artifacts.image_prompts.featured_alt },
+            top: { url: await generateImage(artifacts.image_prompts.top_prompt, 'top', jobId), alt: artifacts.image_prompts.top_alt }
+        };
+
+        // T10: FAQ
+        await update('T10', 92);
+        artifacts.faq = await callLLM('faq', jobId, { ...context, theme: job.theme_pt });
+        await saveArtifact(jobId, 'faq', artifacts.faq);
+
+        // T11: Quality Gate
+        await update('T11', 95);
+        artifacts.quality_gate = await callLLM('quality_gate', jobId, { ...context, content_html: artifacts.article_body.content_html });
+        await saveArtifact(jobId, 'quality_gate', artifacts.quality_gate);
+
         // Final Step: Publication
-        await update('T10', 95);
+        await update('T12', 98);
         const result = await publishToWP(jobId, job, artifacts, blogData[0]);
 
         await pool.query('UPDATE jobs SET status = \'published\', wp_post_id = ?, wp_post_url = ?, progress = 100 WHERE id = ?',

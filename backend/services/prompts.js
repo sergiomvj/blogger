@@ -1,168 +1,142 @@
 export const SYSTEM_PROMPT = `
-Você é um assistente editorial profissional.
+Você é um assistente editorial profissional de alto nível.
+Sua missão é gerar conteúdo otimizado para SEO e engajamento humano.
 
-ESTILO EDITORIAL DO BLOG:
+REGRAS CRÍTICAS DE FORMATO:
+1. Responda APENAS com o objeto JSON solicitado.
+2. Não inclua Markdown (\`\`\`json ... \`\`\`), explicações ou introduções.
+3. Use apenas aspas ASCII duplas (").
+4. Mantenha as chaves (keys) do JSON exatamente no idioma solicitado na instrução da task (geralmente em inglês para padronização técnica).
+5. O valor dos campos deve estar no idioma: {language}.
+
+CONTEXTO DO BLOG:
 {blog_style}
 
-Regras inegociáveis:
-- Responda exclusivamente em JSON
-- O JSON deve validar exatamente contra o schema fornecido
-- Não inclua markdown, explicações ou texto fora do JSON
-- Não use comentários
-- Use aspas ASCII (")
-- Idioma de saída: {language}
-
-Se não tiver certeza, faça a melhor inferência possível sem violar o schema.
+CONTEXTO DO ARTIGO:
+{article_style}
 `;
 
 export const TASK_PROMPTS = {
   semantic_brief: `
-Task: semantic_brief
-Idioma final: {language}
+Gere um brief semântico.
+O JSON deve conter exatamente estas chaves:
+- "brief": (string) Resumo editorial profundo.
+- "audience": (string) Descrição detalhada do público-alvo.
+- "search_intent": (string: "informational", "commercial", "transactional", "navigational" ou "mixed") Intenção de busca.
 
-ESTILO DO ARTIGO (FORMATO):
-{article_style}
-
-Objetivo (PT): {objective_pt}
-Tema central (PT): {theme_pt}
+DADOS:
+Tema: {theme_pt}
+Objetivo: {objective_pt}
 Categoria: {category}
-Tamanho desejado: {word_count} palavras
+`,
 
-Crie um brief semântico no idioma final contendo:
-- resumo editorial claro
-- público-alvo presumido
-- intenção de busca principal
-  `,
   outline: `
-Task: outline
-Idioma final: {language}
+Gere o outline do artigo baseado no Brief Semântico fornecido.
+O JSON deve conter:
+- "title_candidates": (array of strings) 3 a 5 opções de títulos magnéticos.
+- "structure": (array of objects) Cada objeto com "heading" (string) e "level" (int 2 ou 3).
+- "editorial_angle": (string) O ângulo diferencial deste artigo.
 
-Brief:
-{semantic_brief}
+DADOS:
+Brief: {semantic_brief}
+`,
 
-Crie:
-- 3 a 5 sugestões de título
-- Estrutura completa do artigo (H2 e H3)
-- Notas de ângulo editorial (opcional)
-
-Respeite boas práticas de SEO e legibilidade.
-  `,
   keyword_plan: `
-Task: keyword_plan
-Idioma final: {language}
+Gere um plano de palavras-chave.
+JSON:
+- "primary_keyword": (string) A melhor palavra-chave para focar.
+- "secondary_keywords": (array of strings) 3 a 8 palavras secundárias.
+- "lsi_keywords": (array of strings) Termos semanticamente relacionados.
+- "mapping": (array of objects) Seção -> Palavra-chave.
 
-Outline:
-{outline}
+DADOS:
+Outline: {outline}
+`,
 
-Crie um plano de palavras-chave contendo:
-- 1 keyword principal
-- 3 a 12 keywords secundárias
-- 5 a 25 LSI/related keywords
-- Mapeamento keyword → seção
-  `,
   seo_meta: `
-Task: seo_meta
-Idioma final: {language}
+Gere metadados de SEO.
+JSON:
+- "meta_description": (string) Meta descrição persuasiva até 160 caracteres.
+- "focus_keyword": (string) Repita a keyword principal.
 
+DADOS:
 Tema: {theme}
-Keyword principal: {primary_keyword}
+Keyword Principal: {primary_keyword}
+`,
 
-Crie uma meta description persuasiva, natural e clara.
-Tamanho aproximado: até 150 palavras.
-  `,
   seo_title: `
-Task: seo_title
-Idioma final: {language}
+Defina o título final e o slug.
+JSON:
+- "title": (string) O título escolhido.
+- "slug": (string) URL-friendly (apenas letras, números e hífens).
 
-Keyword principal: {primary_keyword}
-Títulos candidatos:
-{title_candidates}
+DADOS:
+Keyword Principal: {primary_keyword}
+Candidatos: {title_candidates}
+`,
 
-Escolha o melhor título e gere um slug otimizado.
-Regras:
-- incluir keyword principal se natural
-- evitar clickbait
-- slug em lowercase, hífens, sem acentos
-  `,
   headings: `
-Task: headings
-Idioma final: {language}
+Otimize os cabeçalhos (headings) para SEO.
+JSON:
+- "headings": (array of objects) Cada um com "text" e "level".
 
-Outline base:
-{outline}
+DADOS:
+Outline: {outline}
+`,
 
-Otimize todos os H2 e H3 para SEO e clareza.
-  `,
   article_body: `
-Task: article_body
-Idioma final: {language}
+Escreva o corpo do artigo em HTML.
+JSON:
+- "content_html": (string) O HTML completo do artigo (use <p>, <h2>, <h3>, <ul>, <li>, <strong>).
+- "word_count": (int) Contagem final de palavras.
 
-Título final:
-{title}
+DADOS:
+Título: {title}
+Headings: {headings}
+Keywords: {primary_keyword}, {secondary_keywords}
+Tamanho alvo: {word_count}
+`,
 
-Headings:
-{headings}
-
-Keyword principal: {primary_keyword}
-Keywords secundárias:
-{secondary_keywords}
-
-Requisitos:
-- Texto completo em HTML válido
-- Introdução clara
-- Desenvolvimento profundo
-- Conclusão com CTA
-- Tamanho alvo: {word_count} palavras
-- Inserção natural de keywords
-  `,
   tags: `
-Task: tags
-Idioma final: {language}
+Sugira tags para o WordPress.
+JSON:
+- "tags": (array of strings) 5 a 10 tags relevantes.
 
+DADOS:
 Tema: {theme}
-Keyword principal: {primary_keyword}
+Keyword: {primary_keyword}
+`,
 
-Sugira tags relevantes.
-  `,
-  faq: `
-Task: faq
-Idioma final: {language}
-
-Tema: {theme}
-Keyword principal: {primary_keyword}
-
-Crie 3 a 6 perguntas frequentes com respostas curtas.
-  `,
   image_prompt: `
-Task: image_prompt
-Idioma final: {language}
+Gere prompts para criação de imagens.
+JSON:
+- "featured_prompt": (string) Prompt detalhado em inglês.
+- "featured_alt": (string) Texto alternativo no idioma local.
+- "top_prompt": (string) Prompt para imagem interna em inglês.
+- "top_alt": (string) Texto alternativo.
 
+DADOS:
 Tema: {theme}
-Keyword principal: {primary_keyword}
+Keyword: {primary_keyword}
+`,
 
-Crie:
-- prompt para featured image
-- prompt para top image
-- alt text para ambas
-
-Regras:
-- NÃO incluir texto na imagem
-- NÃO incluir logos ou marcas
-  `,
   quality_gate: `
-Task: quality_gate
-Idioma final: {language}
+Avalie a qualidade do conteúdo final.
+JSON:
+- "passed": (boolean)
+- "score": (int 0-100)
+- "notes": (string) Observações de melhoria.
 
-Conteúdo gerado:
-{content_html}
+DADOS:
+Conteúdo: {content_html}
+`,
 
-Verifique:
-- idioma correto
-- contagem aproximada de palavras
-- estrutura (H2/H3)
-- SEO básico
-- blacklist terms
+  faq: `
+Crie um FAQ.
+JSON:
+- "faqs": (array of objects) Pergunta e resposta.
 
-Retorne passed=true ou false com notas objetivas.
-  `
+DADOS:
+Tema: {theme}
+`
 };

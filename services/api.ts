@@ -68,5 +68,17 @@ export const api = {
     async syncBlog(id: string) {
         const res = await fetch(`${API_BASE}/blogs/${id}/sync`, { method: 'POST' });
         return res.json();
+    },
+    async updateBlog(id: string, blogData: any) {
+        const res = await fetch(`${API_BASE}/blogs/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(blogData),
+        });
+        return res.json();
+    },
+    async deleteBlog(id: string) {
+        const res = await fetch(`${API_BASE}/blogs/${id}`, { method: 'DELETE' });
+        return res.json();
     }
 };

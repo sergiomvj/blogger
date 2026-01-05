@@ -35,5 +35,7 @@ This project is an automated article generation system for WordPress Multisite.
 - [x] WordPress REST API Integration.
 - [x] SSRF-protected media sideloading.
 - [x] SEO integration (Yoast/RankMath).
-- [x] Central Dashboard Backend skeleton.
-- [x] API communication layer in Frontend.
+- [x] LLM Output Validation & Auto-Repair (AJV).
+- [x] Multi-step AI Pipeline (T0 to T11).
+- [x] Automatic Image Generation (DALL-E 3).
+- [x] Editorial Styles & Templates (seeding included).
