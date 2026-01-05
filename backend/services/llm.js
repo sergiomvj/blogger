@@ -30,11 +30,10 @@ export async function callLLM(task, jobId, context) {
 
             return result.data;
         } catch (error) {
-            console.warn(`Model ${modelConfig.model} failed for task ${task}:`, error.message);
             lastError = error;
-
             // Log failure
-            await logLLMUsage(jobId, task, modelConfig, null, 0, false);
+            console.error(`[LLM DEBUG] Full error for ${modelConfig.model}:`, error.response?.data || error.message);
+            await logLLMUsage(jobId, task, modelConfig, null, 0, false, error.response?.data ? JSON.stringify(error.response.data) : error.message);
 
             continue; // Fallback to next model
         }
@@ -87,13 +86,13 @@ async function attemptGeneration(task, config, context, language) {
     };
 }
 
-async function logLLMUsage(jobId, task, config, usage, latency, success) {
+async function logLLMUsage(jobId, task, config, usage, latency, success, rawMeta = null) {
     try {
         await pool.query(
             `INSERT INTO llm_usage_events (
         id, job_id, revision, task, provider_key, model_id, prompt_version,
-        input_tokens, output_tokens, latency_ms, success
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        input_tokens, output_tokens, latency_ms, success, raw_meta
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 uuidv4(),
                 jobId,
@@ -105,7 +104,8 @@ async function logLLMUsage(jobId, task, config, usage, latency, success) {
                 usage?.input || 0,
                 usage?.output || 0,
                 latency,
-                success
+                success,
+                rawMeta ? JSON.stringify(rawMeta) : null
             ]
         );
     } catch (err) {
