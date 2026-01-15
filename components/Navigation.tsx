@@ -12,6 +12,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentScreen, onNavigate }) =>
     { id: Screen.DASHBOARD, label: 'Início', icon: 'dashboard' },
     { id: Screen.QUEUE, label: 'Fila', icon: 'layers' },
     { id: Screen.BLOGS, label: 'Sites', icon: 'language' },
+    { id: Screen.MEDIA, label: 'Mídia', icon: 'image' },
     { id: Screen.SETTINGS, label: 'Config', icon: 'settings' },
   ];
 

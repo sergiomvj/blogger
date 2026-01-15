@@ -18,6 +18,10 @@ export const api = {
         const res = await fetch(`${API_BASE}/settings`);
         return res.json();
     },
+    async getJobCostEstimates(id: string) {
+        const res = await fetch(`${API_BASE}/jobs/${id}/cost-estimates`);
+        return res.json();
+    },
 
     async updateSettings(settings: any) {
         const res = await fetch(`${API_BASE}/settings`, {
@@ -80,5 +84,80 @@ export const api = {
     async deleteBlog(id: string) {
         const res = await fetch(`${API_BASE}/blogs/${id}`, { method: 'DELETE' });
         return res.json();
+    },
+    async getStatsSummary() {
+        const res = await fetch(`${API_BASE}/stats/summary`);
+        return res.json();
+    },
+    async getStatsHistory() {
+        const res = await fetch(`${API_BASE}/stats/history`);
+        return res.json();
+    },
+    async getStatsDetails() {
+        const res = await fetch(`${API_BASE}/stats/details`);
+        return res.json();
+    },
+    async updateBatchBudget(id: string, budget: number) {
+        const res = await fetch(`${API_BASE}/batches/${id}/budget`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ budget_limit: budget }),
+        });
+        return res.json();
+    },
+    async getActiveBatch() {
+        const res = await fetch(`${API_BASE}/batches/active`);
+        return res.json();
+    },
+    async getDefaultPrompts() {
+        const res = await fetch(`${API_BASE}/prompts/default`);
+        return res.json();
+    },
+    async getCustomPrompts() {
+        const res = await fetch(`${API_BASE}/prompts`);
+        return res.json();
+    },
+    async saveCustomPrompt(taskKey: string, text: string) {
+        const res = await fetch(`${API_BASE}/prompts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_key: taskKey, prompt_text: text }),
+        });
+        return res.json();
+    },
+    async getBlogStyles() {
+        const res = await fetch(`${API_BASE}/blog-styles`);
+        return res.json();
+    },
+    async addBlogStyle(styleData: any) {
+        const res = await fetch(`${API_BASE}/blog-styles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(styleData),
+        });
+        return res.json();
+    },
+    async updateBlogStyle(id: string, styleData: any) {
+        const res = await fetch(`${API_BASE}/blog-styles/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(styleData),
+        });
+        return res.json();
+    },
+    async deleteBlogStyle(id: string) {
+        const res = await fetch(`${API_BASE}/blog-styles/${id}`, { method: 'DELETE' });
+        return res.json();
+    },
+    async getArticleStyles() {
+        const res = await fetch(`${API_BASE}/article-styles`);
+        return res.json();
+    },
+    async getMedia() {
+        const res = await fetch(`${API_BASE}/media`);
+        return res.json();
+    },
+    getBatchBackupUrl(batchId: string) {
+        return `${API_BASE}/batches/${batchId}/backup`;
     }
 };

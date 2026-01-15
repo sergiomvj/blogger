@@ -9,6 +9,8 @@ const sqls = [
     tone_of_voice TEXT,
     target_audience TEXT,
     editorial_guidelines JSON,
+    cta_config JSON,
+    forbidden_terms JSON,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
 
@@ -47,6 +49,7 @@ const sqls = [
     source_csv_filename TEXT,
     created_by TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'created',
+    budget_limit DECIMAL(10,2) DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`,
@@ -151,6 +154,23 @@ const sqls = [
     provider_anthropic_enabled TINYINT(1) DEFAULT 1,
     provider_google_enabled TINYINT(1) DEFAULT 1,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS custom_prompts (
+    task_key VARCHAR(50) PRIMARY KEY,
+    prompt_text TEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS media_assets (
+    id VARCHAR(36) PRIMARY KEY,
+    job_id VARCHAR(36),
+    type VARCHAR(50),
+    url TEXT,
+    remote_url TEXT,
+    alt_text TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
   )`
 ];
 

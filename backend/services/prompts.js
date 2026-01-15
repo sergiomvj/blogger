@@ -138,5 +138,22 @@ JSON:
 
 DADOS:
 Tema: {theme}
+`,
+
+  internal_links: `
+Refine o conteúdo HTML injetando links internos de forma natural.
+O JSON deve conter:
+- "content_html": (string) O HTML atualizado com os links inseridos.
+- "links_added": (int) Quantidade de links inseridos.
+
+DADOS:
+Conteúdo Atual: {content_html}
+Links Disponíveis (Oportunidades): {links_available}
+
+REGRAS:
+1. Use as oportunidades de link de forma contextual e natural.
+2. Não insira mais de 3-5 links no total.
+3. Use a tag <a href="URL">TEXTO</a>.
+4. Se nenhuma oportunidade for relevante, retorne o HTML original e links_added: 0.
 `
 };

@@ -8,6 +8,8 @@ import Settings from './screens/Settings';
 import UploadCSV from './screens/UploadCSV';
 import CostOverview from './screens/CostOverview';
 import Blogs from './screens/Blogs';
+import Presets from './screens/Presets';
+import Media from './screens/Media';
 import Navigation from './components/Navigation';
 
 const App: React.FC = () => {
@@ -57,6 +59,10 @@ const App: React.FC = () => {
         return <CostOverview onNavigate={navigateTo} />;
       case Screen.BLOGS:
         return <Blogs onNavigate={navigateTo} />;
+      case Screen.PRESETS:
+        return <Presets onNavigate={navigateTo} />;
+      case Screen.MEDIA:
+        return <Media onNavigate={navigateTo} />;
       default:
         return <Dashboard onNavigate={navigateTo} />;
     }

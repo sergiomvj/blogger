@@ -22,24 +22,50 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
     provider_anthropic_enabled: true,
     provider_google_enabled: true,
   });
+  const [prompts, setPrompts] = useState<Record<string, string>>({});
+  const [defaultPrompts, setDefaultPrompts] = useState<Record<string, string>>({});
+  const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [tempPrompt, setTempPrompt] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const data = await api.getSettings();
-        if (data && Object.keys(data).length > 0) {
-          setSettings(prev => ({ ...prev, ...data }));
-        }
-      } catch (error) {
-        console.error('Failed to fetch settings:', error);
-      } finally {
-        setLoading(false);
+  const fetchData = async () => {
+    try {
+      const [settingsData, defaults, customs] = await Promise.all([
+        api.getSettings(),
+        api.getDefaultPrompts(),
+        api.getCustomPrompts()
+      ]);
+
+      if (settingsData && Object.keys(settingsData).length > 0) {
+        setSettings(prev => ({ ...prev, ...settingsData }));
       }
-    };
-    fetchSettings();
+
+      setDefaultPrompts(defaults);
+      const customMap: Record<string, string> = {};
+      customs.forEach((p: any) => customMap[p.task_key] = p.prompt_text);
+      setPrompts(customMap);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
+
+  const handleSavePrompt = async () => {
+    if (!editingTask) return;
+    try {
+      await api.saveCustomPrompt(editingTask, tempPrompt);
+      setPrompts(prev => ({ ...prev, [editingTask]: tempPrompt }));
+      setEditingTask(null);
+    } catch (err) {
+      alert('Erro ao salvar prompt');
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -154,6 +180,96 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
             </div>
           </div>
         </section>
+
+        <section className="px-4 pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Biblioteca de Prompts</h3>
+            <span className="text-[10px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded">Prompt Library</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            {Object.keys(defaultPrompts).map(task => (
+              <button
+                key={task}
+                onClick={() => {
+                  setEditingTask(task);
+                  setTempPrompt(prompts[task] || defaultPrompts[task]);
+                }}
+                className="flex items-center justify-between p-4 bg-surface-dark border border-white/5 rounded-xl hover:border-primary/40 transition-all text-left group"
+              >
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white uppercase tracking-tighter">{task.replace('_', ' ')}</span>
+                  <span className="text-[10px] text-slate-500 line-clamp-1 max-w-[200px]">
+                    {prompts[task] ? 'Customizado pelo usuário' : 'Usando padrão do sistema'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {prompts[task] && <span className="size-2 rounded-full bg-primary shadow-glow-xs"></span>}
+                  <span className="material-symbols-outlined text-slate-600 group-hover:text-primary transition-colors">edit_note</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Prompt Editor Modal */}
+        {editingTask && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-surface-dark w-full max-w-2xl rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b border-white/5 flex items-center justify-between bg-slate-900/50">
+                <div className="flex flex-col">
+                  <h3 className="text-sm font-black text-white uppercase tracking-widest">Edit Task Prompt</h3>
+                  <p className="text-[10px] text-primary font-bold">TASK: {editingTask.toUpperCase()}</p>
+                </div>
+                <button onClick={() => setEditingTask(null)} className="size-10 flex items-center justify-center rounded-full hover:bg-white/10 text-slate-400">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+                <div className="bg-black/20 p-3 rounded-lg border border-white/5">
+                  <p className="text-[10px] text-slate-500 mb-2 font-bold uppercase">Prompt Text</p>
+                  <textarea
+                    className="w-full bg-transparent border-none text-white text-[13px] focus:ring-0 font-mono leading-relaxed min-h-[400px]"
+                    value={tempPrompt}
+                    onChange={(e) => setTempPrompt(e.target.value)}
+                  />
+                </div>
+
+                <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 flex items-start gap-3">
+                  <span className="material-symbols-outlined text-primary text-[20px]">lightbulb</span>
+                  <div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Você pode usar variáveis como <code className="text-primary">{`{theme_pt}`}</code>, <code className="text-primary">{`{outline}`}</code>, etc., dependendo da tarefa.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-900/50 border-t border-white/5 flex items-center justify-between gap-3">
+                <button
+                  onClick={() => setTempPrompt(defaultPrompts[editingTask || ''])}
+                  className="px-4 py-2 border border-slate-700 text-slate-400 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
+                >
+                  Resetar para o Padrão
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setEditingTask(null)}
+                    className="px-6 py-2 text-slate-400 text-xs font-bold hover:text-white"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSavePrompt}
+                    className="px-8 py-2 bg-primary text-white rounded-xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-blue-600 transition-all"
+                  >
+                    Salvar Alterações
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="h-px bg-white/5 mx-4 my-2"></div>
 

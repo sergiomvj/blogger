@@ -32,6 +32,7 @@ const STYLES = [
 
 const Blogs: React.FC<BlogsProps> = ({ onNavigate }) => {
     const [blogs, setBlogs] = useState<Blog[]>([]);
+    const [blogStyles, setBlogStyles] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -50,20 +51,26 @@ const Blogs: React.FC<BlogsProps> = ({ onNavigate }) => {
     });
 
     useEffect(() => {
-        fetchBlogs();
+        fetchData();
     }, []);
 
-    const fetchBlogs = async () => {
+    const fetchData = async () => {
         setIsLoading(true);
         try {
-            const data = await api.getBlogs?.() || [];
-            setBlogs(data);
+            const [blogsData, stylesData] = await Promise.all([
+                api.getBlogs?.(),
+                api.getBlogStyles?.()
+            ]);
+            setBlogs(blogsData || []);
+            setBlogStyles(stylesData || []);
         } catch (error) {
-            console.error('Failed to fetch blogs', error);
+            console.error('Failed to fetch data', error);
         } finally {
             setIsLoading(false);
         }
     };
+
+    const fetchBlogs = fetchData; // Alias for backward compatibility if needed
 
     const handleOpenAdd = () => {
         setIsEditing(null);
@@ -147,13 +154,22 @@ const Blogs: React.FC<BlogsProps> = ({ onNavigate }) => {
                     </button>
                     <h1 className="text-xl font-bold">Blogs Clientes</h1>
                 </div>
-                <button
-                    onClick={handleOpenAdd}
-                    className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-glow transition-all active:scale-95 flex items-center gap-2"
-                >
-                    <span className="material-symbols-outlined text-sm">add</span>
-                    NOVO SITE
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => onNavigate(Screen.PRESETS)}
+                        className="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-sm">palette</span>
+                        PRESETS
+                    </button>
+                    <button
+                        onClick={handleOpenAdd}
+                        className="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-glow transition-all active:scale-95 flex items-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        NOVO SITE
+                    </button>
+                </div>
             </header>
 
             <main className="flex-1 overflow-y-auto p-6 no-scrollbar">
@@ -208,7 +224,9 @@ const Blogs: React.FC<BlogsProps> = ({ onNavigate }) => {
                                     </div>
                                     <div className="flex items-center gap-3 text-slate-400">
                                         <span className="material-symbols-outlined text-lg">palette</span>
-                                        <span className="text-xs uppercase font-bold tracking-wider">{STYLES.find(s => s.key === blog.style_key)?.name || blog.style_key}</span>
+                                        <span className="text-xs uppercase font-bold tracking-wider">
+                                            {blogStyles.find(s => s.style_key === blog.style_key)?.name || blog.style_key}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -282,9 +300,10 @@ const Blogs: React.FC<BlogsProps> = ({ onNavigate }) => {
                                             value={formData.style_key}
                                             onChange={e => setFormData({ ...formData, style_key: e.target.value })}
                                         >
-                                            {STYLES.map(s => (
-                                                <option key={s.key} value={s.key}>{s.name}</option>
+                                            {blogStyles.map(s => (
+                                                <option key={s.style_key} value={s.style_key}>{s.name}</option>
                                             ))}
+                                            {blogStyles.length === 0 && <option value="analitica">Analítica (Padrão)</option>}
                                         </select>
                                     </div>
                                 </div>

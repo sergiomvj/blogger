@@ -6,7 +6,9 @@ export enum Screen {
   SETTINGS = 'SETTINGS',
   UPLOAD = 'UPLOAD',
   COSTS = 'COSTS',
-  BLOGS = 'BLOGS'
+  BLOGS = 'BLOGS',
+  PRESETS = 'PRESETS',
+  MEDIA = 'MEDIA'
 }
 
 export type JobStatus = 'Running' | 'Failed' | 'Needs Review' | 'Published' | 'Queued' | 'Processing' | 'processing' | 'failed' | 'published' | 'queued' | 'review';

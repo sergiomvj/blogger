@@ -7,17 +7,30 @@ interface JobQueueProps {
 }
 
 const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
-  const [jobs, setJobs] = useState<Job[]>([
-    { id: '1', title: 'Carregando Dados...', site: 'System', category: 'Status', status: 'Running', progress: 0, icon: 'autorenew', timestamp: 'Agora' },
-  ]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [activeBatch, setActiveBatch] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isUpdatingBudget, setIsUpdatingBudget] = useState(false);
+  const [showCompletionToast, setShowCompletionToast] = useState(false);
+  const [prevRunningCount, setPrevRunningCount] = useState<number | null>(null);
 
   const fetchJobs = async () => {
     try {
-      const data = await api.getJobs();
-      if (data) {
-        setJobs(data);
+      const [jobsData, batchData] = await Promise.all([
+        api.getJobs(),
+        api.getActiveBatch()
+      ]);
+      const currentJobs = jobsData || [];
+      setJobs(currentJobs);
+      if (batchData) setActiveBatch(batchData);
+
+      const runningCount = currentJobs.filter((j: any) => ['running', 'processing', 'Running', 'Processing'].includes(j.status)).length;
+
+      if (prevRunningCount !== null && prevRunningCount > 0 && runningCount === 0) {
+        // Just finished!
+        setShowCompletionToast(true);
       }
+      setPrevRunningCount(runningCount);
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
     } finally {
@@ -27,7 +40,25 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     fetchJobs();
+    const interval = setInterval(fetchJobs, 10000);
+    return () => clearInterval(interval);
   }, []);
+
+  const handleUpdateBudget = async () => {
+    if (!activeBatch) return;
+    const newLimit = prompt('Defina o limite de orçamento para este Batch (USD):', activeBatch.budget_limit || '10.00');
+    if (newLimit === null) return;
+
+    setIsUpdatingBudget(true);
+    try {
+      await api.updateBatchBudget(activeBatch.id, parseFloat(newLimit));
+      fetchJobs();
+    } catch (err) {
+      alert('Erro ao atualizar orçamento');
+    } finally {
+      setIsUpdatingBudget(false);
+    }
+  };
 
   const stats = [
     { label: 'Em Execução', value: jobs.filter(j => ['running', 'processing', 'Running', 'Processing'].includes(j.status)).length.toString(), color: 'bg-primary/10 text-primary border-primary/20', icon: 'sync' },
@@ -76,6 +107,70 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
             </div>
           ))}
         </div>
+
+        {/* Batch Budget Monitoring */}
+        {activeBatch && (
+          <div className={`rounded-2xl p-5 border shadow-xl transition-all ${activeBatch.status === 'budget_exceeded'
+            ? 'bg-rose-950/20 border-rose-500/50 animate-pulse'
+            : 'bg-surface-dark border-white/5'
+            }`}>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1">Active Batch Budget</h3>
+                <p className="text-sm font-black text-white">{activeBatch.name}</p>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={api.getBatchBackupUrl(activeBatch.id)}
+                  download
+                  className="size-8 flex items-center justify-center rounded-lg bg-white/5 text-slate-400 hover:text-white transition-colors"
+                  title="Download Backup"
+                >
+                  <span className="material-symbols-outlined text-[18px]">cloud_download</span>
+                </a>
+                <button
+                  onClick={handleUpdateBudget}
+                  disabled={isUpdatingBudget}
+                  className="size-8 flex items-center justify-center rounded-lg bg-white/5 text-slate-400 hover:text-white transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit_square</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-end justify-between gap-4 mb-3">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Investido</span>
+                <span className="text-xl font-black text-white">${parseFloat(activeBatch.current_cost || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex flex-col text-right">
+                <span className="text-[9px] font-bold text-slate-500 uppercase">Limite</span>
+                <span className="text-sm font-bold text-slate-300">
+                  {activeBatch.budget_limit ? `$${parseFloat(activeBatch.budget_limit).toFixed(2)}` : 'Sem Limite'}
+                </span>
+              </div>
+            </div>
+
+            {activeBatch.budget_limit && (
+              <div className="h-2 w-full rounded-full bg-black/40 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-1000 ${(activeBatch.current_cost / activeBatch.budget_limit) > 0.9 ? 'bg-rose-500' : 'bg-primary'
+                    }`}
+                  style={{ width: `${Math.min(100, (activeBatch.current_cost / activeBatch.budget_limit) * 100)}%` }}
+                ></div>
+              </div>
+            )}
+
+            {activeBatch.status === 'budget_exceeded' && (
+              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3">
+                <span className="material-symbols-outlined text-rose-500">warning</span>
+                <p className="text-[10px] text-rose-200 font-bold leading-tight">
+                  ORÇAMENTO ATINGIDO! O motor pausou o processamento deste batch para evitar gastos extras.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
@@ -175,6 +270,33 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
       <button onClick={() => onNavigate(Screen.UPLOAD)} className="fixed bottom-24 right-4 z-40 flex size-14 items-center justify-center rounded-full bg-primary shadow-xl shadow-primary/30 active:scale-90 transition-all">
         <span className="material-symbols-outlined text-white text-[28px]">add</span>
       </button>
+
+      {/* Completion Toast */}
+      {showCompletionToast && activeBatch && (
+        <div className="fixed top-20 left-4 right-4 z-[100] bg-emerald-600 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between animate-in slide-in-from-top-full duration-500">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined">task_alt</span>
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest">Batch Finalizado!</p>
+              <p className="text-[10px] opacity-90">O lote {activeBatch.name} foi processado.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <a
+              href={api.getBatchBackupUrl(activeBatch.id)}
+              className="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-[10px] font-bold"
+            >
+              BACKUP
+            </a>
+            <button
+              onClick={() => setShowCompletionToast(false)}
+              className="bg-black/20 hover:bg-black/30 px-3 py-1.5 rounded-lg text-[10px] font-bold"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

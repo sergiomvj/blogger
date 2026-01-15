@@ -11,16 +11,19 @@ interface JobDetailsProps {
 const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onNavigate }) => {
   const [job, setJob] = useState<Job | null>(null);
   const [artifacts, setArtifacts] = useState<any[]>([]);
+  const [costEstimates, setCostEstimates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchJobData = async () => {
     try {
-      const [jobData, artifactData] = await Promise.all([
+      const [jobData, artifactData, costData] = await Promise.all([
         api.getJobById(jobId),
-        api.getJobArtifacts(jobId)
+        api.getJobArtifacts(jobId),
+        api.getJobCostEstimates(jobId)
       ]);
       setJob(jobData);
       setArtifacts(artifactData);
+      setCostEstimates(costData.estimates || []);
     } catch (error) {
       console.error('Failed to fetch job details:', error);
     } finally {
@@ -89,7 +92,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onNavigate }) => {
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1 flex-1">
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider w-fit mb-1 ${['published', 'Published'].includes(job.status) ? 'bg-emerald-900/30 text-emerald-400' :
-                  ['failed', 'Failed'].includes(job.status) ? 'bg-rose-900/30 text-rose-400' : 'bg-blue-900/30 text-blue-300'
+                ['failed', 'Failed'].includes(job.status) ? 'bg-rose-900/30 text-rose-400' : 'bg-blue-900/30 text-blue-300'
                 }`}>{job.status}</span>
               <h3 className="text-lg font-bold truncate max-w-[250px]">{job.title || 'Gerando título...'}</h3>
               <p className="text-slate-400 text-sm">{job.site} • {job.category}</p>
@@ -136,6 +139,38 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onNavigate }) => {
           </div>
         </div>
 
+        {/* What-if Pricing Comparison */}
+        {costEstimates.length > 0 && (
+          <div className="mb-6 rounded-2xl bg-surface-dark border border-white/5 p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-[10px] font-bold text-primary uppercase tracking-widest">What-if Pricing Comparison</h4>
+              <span className="text-[10px] text-slate-500 font-mono">Real-time simulation</span>
+            </div>
+            <div className="space-y-3">
+              {costEstimates.map((est, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all group">
+                  <div className="flex items-center gap-3">
+                    <div className="size-8 flex items-center justify-center rounded-lg bg-black text-primary border border-white/10 group-hover:shadow-glow-xs transition-all">
+                      <span className="material-symbols-outlined text-[18px]">query_stats</span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-300">{est.display_name}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-white">${est.estimated_cost}</p>
+                    <p className="text-[9px] text-slate-500 uppercase font-bold tracking-tighter">Estimated</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-3">
+              <span className="material-symbols-outlined text-slate-500 text-[18px]">info</span>
+              <p className="text-[10px] text-slate-500 leading-tight italic">
+                Values calculated based on <b>{((costEstimates[0]?.tokens?.input + costEstimates[0]?.tokens?.output) / 1000).toFixed(1)}K</b> total tokens used in this job.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Logs Section */}
         <div className="rounded-xl bg-black border border-slate-800 overflow-hidden shadow-md">
           <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
@@ -177,6 +212,54 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onNavigate }) => {
               <span className="material-symbols-outlined">description</span>
               Ver Artigo no Site
             </a>
+          </div>
+        )}
+
+        {/* Download Center */}
+        {artifacts.some(a => a.task === 'article_body') && (
+          <div className="mt-8 rounded-2xl bg-surface-dark border border-white/5 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Download Center</h4>
+              <span className="material-symbols-outlined text-primary text-[20px]">download</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                onClick={() => {
+                  const art = artifacts.find(a => a.task === 'article_body');
+                  const blob = new Blob([art.json_data.content_html], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `article-${jobId.substring(0, 8)}.html`;
+                  a.click();
+                }}
+                className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-primary/20 transition-all text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-orange-400">html</span>
+                  <span className="text-xs font-bold text-slate-300">Exportar HTML</span>
+                </div>
+                <span className="material-symbols-outlined text-slate-600 text-[18px]">chevron_right</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const blob = new Blob([JSON.stringify(artifacts, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `artifacts-raw-${jobId.substring(0, 8)}.json`;
+                  a.click();
+                }}
+                className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-primary/20 transition-all text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-blue-400">code_blocks</span>
+                  <span className="text-xs font-bold text-slate-300">Exportar JSON (Full)</span>
+                </div>
+                <span className="material-symbols-outlined text-slate-600 text-[18px]">chevron_right</span>
+              </button>
+            </div>
           </div>
         )}
       </main>

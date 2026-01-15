@@ -12,6 +12,23 @@ export async function publishToWP(jobId, jobData, artifacts, blogCredentials = n
 
     // Build FAQ HTML if present
     let finalContent = artifacts.article_body?.content_html || '';
+
+    // SEO Fallback: JSON-LD
+    const seoTitle = artifacts.seo_title?.title || jobData.job_key;
+    const seoDesc = artifacts.seo_meta?.meta_description || '';
+    const featuredImg = artifacts.images?.featured?.url ? (artifacts.images.featured.url.startsWith('http') ? artifacts.images.featured.url : (process.env.APP_URL + artifacts.images.featured.url)) : '';
+
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": seoTitle,
+        "description": seoDesc,
+        "image": featuredImg,
+        "datePublished": new Date().toISOString(),
+        "author": { "@type": "Person", "name": "Redação " + (blogCredentials?.name || 'Blog') }
+    };
+    finalContent += `\n\n<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`;
+
     if (artifacts.faq?.faqs && artifacts.faq.faqs.length > 0) {
         let faqHtml = '\n\n<h2>Perguntas Frequentes (FAQ)</h2>\n<div class="autowriter-faq">';
         artifacts.faq.faqs.forEach(item => {
@@ -68,5 +85,31 @@ export async function publishToWP(jobId, jobData, artifacts, blogCredentials = n
     } catch (error) {
         console.error('WP Publish Error:', error.response?.data || error.message);
         throw error;
+    }
+}
+
+export async function getWPPosts(blogCredentials) {
+    const wpUrl = blogCredentials?.api_url;
+    const wpPassword = blogCredentials?.auth_credentials?.password;
+    const wpUser = blogCredentials?.wp_user || 'admin';
+
+    if (!wpUrl || !wpPassword) return [];
+
+    const auth = Buffer.from(`${wpUser}:${wpPassword}`).toString('base64');
+
+    try {
+        // Fetch published posts from the standard WP REST API
+        // blogCredentials.api_url is expected to be like https://site.com/wp-json
+        const response = await axios.get(`${wpUrl}/wp/v2/posts?per_page=20&status=publish`, {
+            headers: { 'Authorization': `Basic ${auth}` }
+        });
+
+        return response.data.map(p => ({
+            title: p.title.rendered,
+            url: p.link
+        }));
+    } catch (error) {
+        console.warn(`[WP] Could not fetch posts for ${blogCredentials.blog_key}:`, error.message);
+        return [];
     }
 }

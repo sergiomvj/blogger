@@ -1,20 +1,64 @@
 import axios from 'axios';
 import { pool } from './db.js';
+import fs from 'fs';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const mediaDir = path.join(__dirname, '../media');
+
+if (!fs.existsSync(mediaDir)) {
+    fs.mkdirSync(mediaDir, { recursive: true });
+}
 
 export async function generateImage(prompt, type = 'featured', jobId) {
     try {
         const [settingsRows] = await pool.query('SELECT openai_api_key, stability_api_key, image_mode FROM settings WHERE id = 1');
         const settings = settingsRows[0] || {};
 
+        let remoteUrl = null;
         if (settings.image_mode === 'stability') {
-            return await generateStabilityImage(prompt, settings.stability_api_key);
+            remoteUrl = await generateStabilityImage(prompt, settings.stability_api_key);
         } else {
-            return await generateDalleImage(prompt, settings.openai_api_key);
+            remoteUrl = await generateDalleImage(prompt, settings.openai_api_key);
         }
+
+        if (!remoteUrl) return null;
+
+        // Download locally
+        const filename = `${uuidv4()}.png`;
+        const localPath = path.join(mediaDir, filename);
+        await downloadImage(remoteUrl, localPath);
+
+        const localUrl = `/media/${filename}`;
+
+        // Save to DB
+        await pool.query(
+            'INSERT INTO media_assets (id, job_id, type, url, remote_url) VALUES (?, ?, ?, ?, ?)',
+            [uuidv4(), jobId, type, localUrl, remoteUrl]
+        );
+
+        return localUrl;
     } catch (error) {
         console.error(`Image Generation Error (${type}):`, error.message);
-        return null; // Fallback to no image instead of failing the whole job
+        return null;
     }
+}
+
+async function downloadImage(url, dest) {
+    const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream'
+    });
+    return new Promise((resolve, reject) => {
+        const writer = fs.createWriteStream(dest);
+        response.data.pipe(writer);
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+    });
 }
 
 async function generateDalleImage(prompt, apiKey) {
@@ -31,7 +75,7 @@ async function generateDalleImage(prompt, apiKey) {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
         },
-        timeout: 60000
+        timeout: 90000
     });
 
     return response.data.data[0].url;
@@ -39,8 +83,5 @@ async function generateDalleImage(prompt, apiKey) {
 
 async function generateStabilityImage(prompt, apiKey) {
     if (!apiKey) throw new Error('Stability API Key not configured');
-
-    // Stability implementation would go here... for now fallback to placeholder or error
-    // (User might want to implement this later or use DALL-E as default)
     throw new Error('Stability AI implementation pending. Please use DALL-E 3 for now.');
 }

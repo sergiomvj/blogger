@@ -7,9 +7,11 @@ import { parse } from 'csv-parse/sync';
 import fs from 'fs';
 import { pool } from './services/db.js';
 import { callLLM } from './services/llm.js';
-import { publishToWP } from './services/wordpress.js';
+import { publishToWP, getWPPosts } from './services/wordpress.js';
+import { TASK_PROMPTS } from './services/prompts.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import AdmZip from 'adm-zip';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +56,32 @@ app.get('/api/batches', dbCheck, async (req, res) => {
     }
 });
 
+app.get('/api/batches/active', dbCheck, async (req, res) => {
+    try {
+        const [batches] = await pool.query('SELECT * FROM batches ORDER BY created_at DESC LIMIT 1');
+        if (batches.length === 0) return res.json(null);
+
+        const batch = batches[0];
+        const [costRows] = await pool.query(`
+            SELECT SUM(
+                (u.input_tokens / 1000000) * IFNULL(p.input_per_1m_tokens, 0) +
+                (u.output_tokens / 1000000) * IFNULL(p.output_per_1m_tokens, 0)
+            ) as current_cost
+            FROM jobs j
+            JOIN llm_usage_events u ON j.id = u.job_id
+            LEFT JOIN pricing_profiles p ON u.model_id = p.profile_key
+            WHERE j.batch_id = ?
+        `, [batch.id]);
+
+        res.json({
+            ...batch,
+            current_cost: costRows[0].current_cost || 0
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/jobs', dbCheck, async (req, res) => {
     try {
         const { batch_id } = req.query;
@@ -61,6 +89,50 @@ app.get('/api/jobs', dbCheck, async (req, res) => {
             ? await pool.query('SELECT * FROM jobs WHERE batch_id = ? ORDER BY created_at DESC', [batch_id])
             : await pool.query('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 50');
         res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/batches/:id/budget', dbCheck, async (req, res) => {
+    const { id } = req.params;
+    const { budget_limit } = req.body;
+    try {
+        await pool.query('UPDATE batches SET budget_limit = ? WHERE id = ?', [budget_limit, id]);
+        res.json({ message: 'Budget limit updated' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/batches/:id/backup', dbCheck, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [jobs] = await pool.query('SELECT * FROM jobs WHERE batch_id = ?', [id]);
+        const zip = new AdmZip();
+
+        for (const job of jobs) {
+            const [artifacts] = await pool.query('SELECT * FROM job_artifacts WHERE job_id = ?', [job.id]);
+            const folderName = `${job.job_key.replace(/[^a-z0-9]/gi, '_')}_${job.id.substring(0, 5)}`;
+
+            // Add raw artifacts JSON
+            zip.addFile(`${folderName}/artifacts.json`, Buffer.from(JSON.stringify(artifacts, null, 2)));
+
+            // If article body exists, add it as HTML for easy reading
+            const bodyArt = artifacts.find(a => a.task === 'article_body');
+            if (bodyArt) {
+                const html = `<h1>${job.job_key}</h1>\n${bodyArt.json_data.content_html || ''}`;
+                zip.addFile(`${folderName}/article.html`, Buffer.from(html));
+            }
+        }
+
+        const buffer = zip.toBuffer();
+        res.set({
+            'Content-Type': 'application/zip',
+            'Content-Disposition': `attachment; filename=batch-backup-${id.substring(0, 8)}.zip`,
+            'Content-Length': buffer.length
+        });
+        res.send(buffer);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -147,6 +219,99 @@ app.post('/api/blogs/:id/sync', dbCheck, async (req, res) => {
     }
 });
 
+app.get('/api/jobs/:id/cost-estimates', dbCheck, async (req, res) => {
+    try {
+        const { id } = req.params;
+        // 1. Get total tokens for this job
+        const [usage] = await pool.query(
+            'SELECT SUM(input_tokens) as input, SUM(output_tokens) as output FROM llm_usage_events WHERE job_id = ?',
+            [id]
+        );
+
+        if (!usage[0] || usage[0].input === null) {
+            return res.json({ estimates: [] });
+        }
+
+        const tokens = { input: usage[0].input || 0, output: usage[0].output || 0 };
+
+        // 2. Get all active pricing profiles
+        const [profiles] = await pool.query('SELECT * FROM pricing_profiles WHERE is_active = 1');
+
+        // 3. Calculate estimate for each profile
+        const estimates = profiles.map(p => {
+            const cost_in = (tokens.input / 1000000) * p.input_per_1m_tokens;
+            const cost_out = (tokens.output / 1000000) * p.output_per_1m_tokens;
+            return {
+                profile_key: p.profile_key,
+                display_name: p.display_name,
+                estimated_cost: (cost_in + cost_out).toFixed(4),
+                currency: p.currency,
+                tokens
+            };
+        });
+
+        res.json({ estimates });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Style Endpoints ---
+app.get('/api/blog-styles', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM blog_styles ORDER BY created_at DESC');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/blog-styles', dbCheck, async (req, res) => {
+    const { style_key, name, description, tone_of_voice, target_audience, editorial_guidelines, cta_config, forbidden_terms } = req.body;
+    try {
+        const id = uuidv4();
+        await pool.query(
+            'INSERT INTO blog_styles (id, style_key, name, description, tone_of_voice, target_audience, editorial_guidelines, cta_config, forbidden_terms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, style_key, name, description, tone_of_voice, target_audience, JSON.stringify(editorial_guidelines || []), JSON.stringify(cta_config || []), JSON.stringify(forbidden_terms || [])]
+        );
+        res.json({ message: 'Style created', id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/blog-styles/:id', dbCheck, async (req, res) => {
+    const { id } = req.params;
+    const { style_key, name, description, tone_of_voice, target_audience, editorial_guidelines, cta_config, forbidden_terms } = req.body;
+    try {
+        await pool.query(
+            'UPDATE blog_styles SET style_key = ?, name = ?, description = ?, tone_of_voice = ?, target_audience = ?, editorial_guidelines = ?, cta_config = ?, forbidden_terms = ? WHERE id = ?',
+            [style_key, name, description, tone_of_voice, target_audience, JSON.stringify(editorial_guidelines || []), JSON.stringify(cta_config || []), JSON.stringify(forbidden_terms || []), id]
+        );
+        res.json({ message: 'Style updated' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/blog-styles/:id', dbCheck, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM blog_styles WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Style deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/article-styles', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM article_styles ORDER BY created_at DESC');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Settings Endpoints ---
 app.get('/api/settings', dbCheck, async (req, res) => {
     try {
@@ -193,6 +358,46 @@ app.post('/api/settings', dbCheck, async (req, res) => {
             ]
         );
         res.json({ message: 'Settings saved' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Prompts Library ---
+app.get('/api/prompts/default', (req, res) => {
+    res.json(TASK_PROMPTS);
+});
+
+// --- Media Support ---
+app.use('/media', express.static(path.join(__dirname, 'media')));
+
+app.get('/api/media', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT m.*, j.theme_pt FROM media_assets m LEFT JOIN jobs j ON m.job_id = j.id ORDER BY m.created_at DESC');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/prompts', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM custom_prompts');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/prompts', dbCheck, async (req, res) => {
+    const { task_key, prompt_text } = req.body;
+    if (!task_key || !prompt_text) return res.status(400).json({ error: 'Missing task_key or prompt_text' });
+    try {
+        await pool.query(
+            'INSERT INTO custom_prompts (task_key, prompt_text) VALUES (?, ?) ON DUPLICATE KEY UPDATE prompt_text = VALUES(prompt_text)',
+            [task_key, prompt_text]
+        );
+        res.json({ message: 'Prompt saved' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -286,6 +491,73 @@ app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
     }
 });
 
+// --- Stats Endpoints ---
+app.get('/api/stats/summary', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT 
+                COUNT(DISTINCT j.id) as total_articles,
+                SUM(u.input_tokens) as total_input_tokens,
+                SUM(u.output_tokens) as total_output_tokens,
+                SUM(
+                    (u.input_tokens / 1000000) * IFNULL(p.input_per_1m_tokens, 0) +
+                    (u.output_tokens / 1000000) * IFNULL(p.output_per_1m_tokens, 0)
+                ) as total_cost_usd
+            FROM jobs j
+            LEFT JOIN llm_usage_events u ON j.id = u.job_id
+            LEFT JOIN pricing_profiles p ON u.model_id = p.profile_key
+        `);
+        res.json(rows[0] || { total_articles: 0, total_input_tokens: 0, total_output_tokens: 0, total_cost_usd: 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/stats/history', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT 
+                DATE_FORMAT(u.created_at, '%b %d') as date,
+                CAST(SUM(
+                    (u.input_tokens / 1000000) * IFNULL(p.input_per_1m_tokens, 0) +
+                    (u.output_tokens / 1000000) * IFNULL(p.output_per_1m_tokens, 0)
+                ) AS DECIMAL(10,4)) as llm,
+                0 as images
+            FROM llm_usage_events u
+            LEFT JOIN pricing_profiles p ON u.model_id = p.profile_key
+            WHERE u.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY DATE(u.created_at), date
+            ORDER BY DATE(u.created_at) ASC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/stats/details', dbCheck, async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT 
+                u.model_id as label,
+                p.display_name as provider,
+                SUM(
+                    (u.input_tokens / 1000000) * IFNULL(p.input_per_1m_tokens, 0) +
+                    (u.output_tokens / 1000000) * IFNULL(p.output_per_1m_tokens, 0)
+                ) as cost,
+                SUM(u.input_tokens + u.output_tokens) as unit_count,
+                'Tokens' as unit_label
+            FROM llm_usage_events u
+            JOIN pricing_profiles p ON u.model_id = p.profile_key
+            GROUP BY u.model_id, p.display_name
+            ORDER BY cost DESC
+        `);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Serve Frontend Assets ---
 // Resiliente para Local (../dist) e Docker (./dist)
 let distPath = path.resolve(__dirname, 'dist');
@@ -308,11 +580,43 @@ async function processBatchBackground(batchId) {
     processNextInQueue();
 }
 
+async function checkBatchBudget(batchId) {
+    const [batchRows] = await pool.query('SELECT budget_limit FROM batches WHERE id = ?', [batchId]);
+    const limit = batchRows[0]?.budget_limit;
+    if (limit === null || limit === undefined) return true;
+
+    const [costRows] = await pool.query(`
+        SELECT SUM(
+            (u.input_tokens / 1000000) * IFNULL(p.input_per_1m_tokens, 0) +
+            (u.output_tokens / 1000000) * IFNULL(p.output_per_1m_tokens, 0)
+        ) as current_cost
+        FROM jobs j
+        JOIN llm_usage_events u ON j.id = u.job_id
+        LEFT JOIN pricing_profiles p ON u.model_id = p.profile_key
+        WHERE j.batch_id = ?
+    `, [batchId]);
+
+    const currentCost = costRows[0].current_cost || 0;
+    return currentCost < parseFloat(limit);
+}
+
 async function processNextInQueue() {
     if (activeJobs >= 3 || jobQueue.length === 0) return;
 
+    const job = jobQueue[0]; // Espia o próximo
+    const isWithinBudget = await checkBatchBudget(job.batch_id);
+
+    if (!isWithinBudget) {
+        console.log(`[BUDGET] Limite de gastos atingido para o batch ${job.batch_id}. Pausando jobs deste batch.`);
+        // Remove todos os jobs deste batch da fila ativa (opcional, ou apenas pula)
+        // Por simplicidade, vamos apenas retornar e parar o processamento da fila por agora
+        // No mundo real, deveríamos marcar o batch como 'paused' ou similar.
+        await pool.query('UPDATE batches SET status = \'budget_exceeded\' WHERE id = ?', [job.batch_id]);
+        return;
+    }
+
+    jobQueue.shift(); // Remove de fato
     activeJobs++;
-    const job = jobQueue.shift();
 
     runJobPipeline(job).finally(() => {
         activeJobs--;
@@ -329,7 +633,7 @@ async function runJobPipeline(job) {
 
     // Fetch Style Context
     const [blogData] = await pool.query(
-        `SELECT b.*, s.tone_of_voice, s.target_audience, s.editorial_guidelines, s.description as style_desc
+        `SELECT b.*, s.tone_of_voice, s.target_audience, s.editorial_guidelines, s.cta_config, s.forbidden_terms, s.description as style_desc
          FROM blogs b 
          LEFT JOIN blog_styles s ON b.style_key = s.style_key 
          WHERE b.blog_key = ?`,
@@ -342,12 +646,14 @@ async function runJobPipeline(job) {
     );
 
     const blogStyle = blogData[0] ?
-        `Tom: ${blogData[0].tone_of_voice}\nPúblico: ${blogData[0].target_audience}\nDiretrizes: ${JSON.stringify(blogData[0].editorial_guidelines)}` :
+        `Tom: ${blogData[0].tone_of_voice}\nPúblico: ${blogData[0].target_audience}\nDiretrizes: ${JSON.stringify(blogData[0].editorial_guidelines)}\nCTAs: ${JSON.stringify(blogData[0].cta_config)}` :
         "Estilo padrão: Neutro e informativo.";
 
     const articleStyle = artStyleData[0] ?
         `Tipo: ${artStyleData[0].name}\nDescrição: ${artStyleData[0].description}\nEstrutura Desejada: ${JSON.stringify(artStyleData[0].structure_blueprint)}` :
         "Formato padrão: Artigo técnico.";
+
+    const blacklist = blogData[0]?.forbidden_terms ? (typeof blogData[0].forbidden_terms === 'string' ? JSON.parse(blogData[0].forbidden_terms) : blogData[0].forbidden_terms) : [];
 
     const context = {
         ...job,
@@ -402,6 +708,24 @@ async function runJobPipeline(job) {
         });
         await saveArtifact(jobId, 'article_body', artifacts.article_body);
 
+        // T13: Internal Links
+        await update('T13', 72);
+        try {
+            const posts = await getWPPosts(blogData[0]);
+            if (posts.length > 0) {
+                const linkData = await callLLM('internal_links', jobId, {
+                    content_html: artifacts.article_body.content_html,
+                    links_available: JSON.stringify(posts)
+                });
+                if (linkData.content_html) {
+                    artifacts.article_body.content_html = linkData.content_html;
+                    await saveArtifact(jobId, 'internal_links', { links_added: linkData.links_added });
+                }
+            }
+        } catch (linkErr) {
+            console.warn(`[T13] Internal Links failed for job ${jobId}:`, linkErr.message);
+        }
+
         // T7: Tags
         await update('T7', 75);
         artifacts.tags = await callLLM('tags', jobId, { ...context, theme: job.theme_pt, primary_keyword: artifacts.keyword_plan.primary_keyword });
@@ -427,7 +751,16 @@ async function runJobPipeline(job) {
 
         // T11: Quality Gate
         await update('T11', 95);
+        const hardChecks = runHardQualityChecks(artifacts.article_body.content_html, job, blacklist);
         artifacts.quality_gate = await callLLM('quality_gate', jobId, { ...context, content_html: artifacts.article_body.content_html });
+
+        // Merge results
+        artifacts.quality_gate.hard_checks = hardChecks;
+        if (!hardChecks.passed) {
+            artifacts.quality_gate.passed = false;
+            artifacts.quality_gate.notes = (artifacts.quality_gate.notes || '') + '\n[HARD CHECKS FAIL]: ' + hardChecks.errors.join(' ');
+        }
+
         await saveArtifact(jobId, 'quality_gate', artifacts.quality_gate);
 
         // Final Step: Publication
@@ -441,6 +774,46 @@ async function runJobPipeline(job) {
         console.error(`Pipeline Error [${jobId}]:`, error);
         await pool.query('UPDATE jobs SET status = \'failed\', last_error = ? WHERE id = ?', [error.message, jobId]);
     }
+}
+
+function runHardQualityChecks(html, job, blacklist = []) {
+    const results = {
+        passed: true,
+        errors: [],
+        word_count: html.replace(/<[^>]*>/g, ' ').split(/\s+/).filter(x => x).length
+    };
+
+    // 1. Word Count Check (Permite 20% de margem)
+    if (results.word_count < (job.word_count * 0.8)) {
+        results.passed = false;
+        results.errors.push(`Contagem de palavras insuficiente (${results.word_count}/${job.word_count}).`);
+    }
+
+    // 2. HTML Hierarchy Check
+    const headings = html.match(/<h[1-6][^>]*>/gi) || [];
+    const levels = headings.map(h => parseInt(h[2]));
+
+    if (levels.includes(1)) {
+        results.errors.push("O corpo contém tag <h1>. Remova-a (título WP já é H1).");
+        results.passed = false;
+    }
+
+    for (let i = 0; i < levels.length - 1; i++) {
+        if (levels[i + 1] > levels[i] + 1) {
+            results.errors.push(`Salto na hierarquia: H${levels[i]} -> H${levels[i + 1]}.`);
+            results.passed = false;
+        }
+    }
+
+    // 3. Blacklist Check
+    for (const term of blacklist) {
+        if (html.toLowerCase().includes(term.toLowerCase())) {
+            results.errors.push(`Termo proibido: "${term}".`);
+            results.passed = false;
+        }
+    }
+
+    return results;
 }
 
 async function saveArtifact(jobId, task, data) {
