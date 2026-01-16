@@ -155,5 +155,16 @@ REGRAS:
 2. Não insira mais de 3-5 links no total.
 3. Use a tag <a href="URL">TEXTO</a>.
 4. Se nenhuma oportunidade for relevante, retorne o HTML original e links_added: 0.
+`,
+
+  keyword_suggestion: `
+Você é um especialista em SEO. 
+Para o tema "{theme}" com o objetivo "{objective}", gere as 5 melhores palavras-chave e os 5 melhores termos de cauda longa para este artigo em {language}. 
+Retorne um objeto JSON com a chave "keywords" contendo todos os 10 termos separados por vírgula.
+
+DADOS:
+Tema: {theme}
+Objetivo: {objective}
+Idioma: {language}
 `
 };

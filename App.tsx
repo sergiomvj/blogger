@@ -10,6 +10,9 @@ import CostOverview from './screens/CostOverview';
 import Blogs from './screens/Blogs';
 import Presets from './screens/Presets';
 import Media from './screens/Media';
+import NewArticle from './screens/NewArticle';
+import PreArticleReview from './screens/PreArticleReview';
+import Articles from './screens/Articles';
 import Navigation from './components/Navigation';
 
 const App: React.FC = () => {
@@ -63,6 +66,12 @@ const App: React.FC = () => {
         return <Presets onNavigate={navigateTo} />;
       case Screen.MEDIA:
         return <Media onNavigate={navigateTo} />;
+      case Screen.NEW_ARTICLE:
+        return <NewArticle onNavigate={navigateTo} />;
+      case Screen.PRE_ARTICLE_REVIEW:
+        return <PreArticleReview onNavigate={navigateTo} />;
+      case Screen.ARTICLES:
+        return <Articles onNavigate={navigateTo} />;
       default:
         return <Dashboard onNavigate={navigateTo} />;
     }

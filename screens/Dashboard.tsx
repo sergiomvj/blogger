@@ -91,6 +91,50 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           ))}
         </section>
 
+        <section className="mb-8">
+          <h3 className="text-lg font-bold mb-4">Ações Rápidas</h3>
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              onClick={() => onNavigate(Screen.NEW_ARTICLE)}
+              className="flex items-center gap-4 bg-primary/10 border border-primary/20 p-4 rounded-xl hover:bg-primary/20 transition-colors text-left"
+            >
+              <div className="size-12 rounded-full bg-primary flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-white">add_circle</span>
+              </div>
+              <div>
+                <p className="font-bold text-primary">Iniciar um novo artigo</p>
+                <p className="text-xs text-slate-400">Configure um artigo individual com SEO otimizado</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onNavigate(Screen.PRE_ARTICLE_REVIEW)}
+              className="flex items-center gap-4 bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl hover:bg-amber-500/20 transition-colors text-left"
+            >
+              <div className="size-12 rounded-full bg-amber-500 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-white">rate_review</span>
+              </div>
+              <div>
+                <p className="font-bold text-amber-500">Revisar pré-artigo</p>
+                <p className="text-xs text-slate-400">Ajuste escolhas e finalize parâmetros de SEO</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onNavigate(Screen.ARTICLES)}
+              className="flex items-center gap-4 bg-violet-500/10 border border-violet-500/20 p-4 rounded-xl hover:bg-violet-500/20 transition-colors text-left"
+            >
+              <div className="size-12 rounded-full bg-violet-500 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-white">article</span>
+              </div>
+              <div>
+                <p className="font-bold text-violet-500">Meus Artigos</p>
+                <p className="text-xs text-slate-400">Veja todos os artigos publicados e filtre por blog</p>
+              </div>
+            </button>
+          </div>
+        </section>
+
         <section>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold">Recent Activity</h3>

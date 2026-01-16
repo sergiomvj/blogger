@@ -210,5 +210,20 @@ export const SCHEMAS = {
                 }
             }
         }
+    },
+    keyword_suggestion: {
+        type: "object",
+        required: ["task", "language", "prompt_version", "data"],
+        properties: {
+            task: { const: "keyword_suggestion" },
+            language: { enum: ["pt", "en", "es"] },
+            data: {
+                type: "object",
+                required: ["keywords"],
+                properties: {
+                    keywords: { type: "string" }
+                }
+            }
+        }
     }
 };

@@ -8,7 +8,10 @@ export enum Screen {
   COSTS = 'COSTS',
   BLOGS = 'BLOGS',
   PRESETS = 'PRESETS',
-  MEDIA = 'MEDIA'
+  MEDIA = 'MEDIA',
+  NEW_ARTICLE = 'NEW_ARTICLE',
+  PRE_ARTICLE_REVIEW = 'PRE_ARTICLE_REVIEW',
+  ARTICLES = 'ARTICLES'
 }
 
 export type JobStatus = 'Running' | 'Failed' | 'Needs Review' | 'Published' | 'Queued' | 'Processing' | 'processing' | 'failed' | 'published' | 'queued' | 'review';

@@ -1,37 +1,30 @@
-import mysql from 'mysql2/promise';
+import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Configuração robusta para MariaDB/MySQL (Local ou VPS)
-let pool;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (process.env.DATABASE_URL) {
-    console.log('[DB] Usando Connection String do DATABASE_URL');
-    pool = mysql.createPool(process.env.DATABASE_URL + '?ssl={"rejectUnauthorized":false}');
-} else {
-    const connectionConfig = {
-        host: process.env.DB_HOST || 'localhost',
-        port: parseInt(process.env.DB_PORT) || 3306,
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME || 'webserver',
-        ssl: false,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0,
-        connectTimeout: 20000
-    };
-    console.log(`[DB] Tentando conectar ao Host: ${connectionConfig.host}:${connectionConfig.port}`);
-    pool = mysql.createPool(connectionConfig);
+if (!supabaseUrl || !supabaseServiceKey) {
+    console.warn('⚠️ Credenciais do Supabase não encontradas. O sistema pode falhar se tentar usar o Supabase.');
 }
 
-export { pool };
-
-// Teste de conexão com log detalhado
-pool.query('SELECT 1').then(() => {
-    console.log('✅ Conexão com o Banco de Dados estabelecida com sucesso!');
-}).catch(err => {
-    console.error('❌ Erro Crítico de Conexão com o Banco:', err.message);
-    console.error('Dica: Verifique se o Host Interno e a Senha no Easypanel estão corretos.');
+// Cliente para o Backend (Service Role - Bypass RLS)
+export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
 });
+
+// Duck-typing para manter compatibilidade com o pool do mysql2 enquanto migramos
+// Isso permite que o código que usa 'pool.query' continue funcionando ou nos dê um erro claro
+export const pool = {
+    query: async (sql, params) => {
+        console.warn('⚠️ Chamada legada ao pool.query detectada. Migre para o cliente Supabase.');
+        throw new Error('MySQL Pool is deprecated. Use Supabase client.');
+    }
+};
+
+console.log('🚀 Supabase Service initialized');

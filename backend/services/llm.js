@@ -5,7 +5,7 @@ import addFormats from 'ajv-formats';
 import { SYSTEM_PROMPT, TASK_PROMPTS } from './prompts.js';
 import { ROUTER_CONFIG } from './router.js';
 import { SCHEMAS } from './schemas.js';
-import { pool } from './db.js';
+import { supabase } from './db.js';
 import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
@@ -28,8 +28,8 @@ export async function callLLM(task, jobId, context) {
     };
 
     try {
-        const [rows] = await pool.query('SELECT * FROM settings WHERE id = 1');
-        if (rows[0]) settingsData = { ...settingsData, ...rows[0] };
+        const { data: settings, error } = await supabase.from('settings').select('*').eq('id', 1).single();
+        if (settings) settingsData = { ...settingsData, ...settings };
     } catch (err) {
         console.warn('[LLM] Failed to fetch settings:', err.message);
     }
@@ -54,8 +54,8 @@ export async function callLLM(task, jobId, context) {
     // 4. Fetch Custom Prompt Override
     let customPrompt = null;
     try {
-        const [pRows] = await pool.query('SELECT prompt_text FROM custom_prompts WHERE task_key = ?', [task]);
-        if (pRows[0]) customPrompt = pRows[0].prompt_text;
+        const { data: pData } = await supabase.from('custom_prompts').select('prompt_text').eq('task_key', task).single();
+        if (pData) customPrompt = pData.prompt_text;
     } catch (err) {
         console.warn('[LLM] Custom prompt fetch failed:', err.message);
     }
@@ -237,17 +237,21 @@ Regras:
 
 async function logLLMUsage(jobId, task, config, usage, latency, success, meta = {}) {
     try {
-        await pool.query(
-            `INSERT INTO llm_usage_events (
-                id, job_id, revision, task, provider_key, model_id, prompt_version,
-                input_tokens, output_tokens, latency_ms, success, event_type, raw_meta
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                uuidv4(), jobId, 1, task, config.provider, config.model, '1.0.0',
-                usage?.input || 0, usage?.output || 0, latency,
-                success, meta.event_type || 'primary', JSON.stringify(meta)
-            ]
-        );
+        await supabase.from('llm_usage_events').insert({
+            id: uuidv4(),
+            job_id: jobId,
+            revision: 1,
+            task: task,
+            provider_key: config.provider,
+            model_id: config.model,
+            prompt_version: '1.0.0',
+            input_tokens: usage?.input || 0,
+            output_tokens: usage?.output || 0,
+            latency_ms: latency,
+            success: success,
+            event_type: meta.event_type || 'primary',
+            raw_meta: meta
+        });
     } catch (err) {
         // console.warn('[LLM] Logging failure:', err.message);
     }

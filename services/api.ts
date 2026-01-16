@@ -163,5 +163,46 @@ export const api = {
     },
     getBatchBackupUrl(batchId: string) {
         return `${API_BASE}/batches/${batchId}/backup`;
+    },
+
+    // Pre-Articles
+    async getPreArticles() {
+        const res = await fetch(`${API_BASE}/pre-articles`);
+        return res.json();
+    },
+    async savePreArticle(data: any) {
+        const res = await fetch(`${API_BASE}/pre-articles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return res.json();
+    },
+    async updatePreArticle(id: string, data: any) {
+        const res = await fetch(`${API_BASE}/pre-articles/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return res.json();
+    },
+    async deletePreArticle(id: string) {
+        const res = await fetch(`${API_BASE}/pre-articles/${id}`, { method: 'DELETE' });
+        return res.json();
+    },
+    async searchKeywords(data: { theme: string, objective: string, language: string }) {
+        const res = await fetch(`${API_BASE}/seo/search-keywords`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return res.json();
+    },
+
+    // Published Articles
+    async getPublishedArticles(blogKey?: string) {
+        const url = blogKey ? `${API_BASE}/articles?blog_key=${blogKey}` : `${API_BASE}/articles`;
+        const res = await fetch(url);
+        return res.json();
     }
 };

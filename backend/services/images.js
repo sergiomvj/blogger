@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { pool } from './db.js';
+import { supabase } from './db.js';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,8 +15,7 @@ if (!fs.existsSync(mediaDir)) {
 
 export async function generateImage(prompt, type = 'featured', jobId) {
     try {
-        const [settingsRows] = await pool.query('SELECT openai_api_key, stability_api_key, image_mode FROM settings WHERE id = 1');
-        const settings = settingsRows[0] || {};
+        const { data: settings } = await supabase.from('settings').select('openai_api_key, stability_api_key, image_mode').eq('id', 1).single();
 
         let remoteUrl = null;
         if (settings.image_mode === 'stability') {
@@ -35,10 +34,13 @@ export async function generateImage(prompt, type = 'featured', jobId) {
         const localUrl = `/media/${filename}`;
 
         // Save to DB
-        await pool.query(
-            'INSERT INTO media_assets (id, job_id, type, url, remote_url) VALUES (?, ?, ?, ?, ?)',
-            [uuidv4(), jobId, type, localUrl, remoteUrl]
-        );
+        await supabase.from('media_assets').insert({
+            id: uuidv4(),
+            job_id: jobId,
+            type: type,
+            url: localUrl,
+            remote_url: remoteUrl
+        });
 
         return localUrl;
     } catch (error) {

@@ -9,6 +9,7 @@
         "migrate": "node migrate.js"
     },
     "dependencies": {
+        "@supabase/supabase-js": "^2.90.1",
         "adm-zip": "^0.5.16",
         "ajv": "^8.17.1",
         "ajv-formats": "^3.0.1",

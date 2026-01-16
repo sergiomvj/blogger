@@ -47,6 +47,10 @@ export const ROUTER_CONFIG = {
         semantic_brief: [
             { provider: "openai", model: "openai/gpt-4o-mini", priority: 1 },
             { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free", priority: 2 }
+        ],
+        keyword_suggestion: [
+            { provider: "openai", model: "openai/gpt-4o-mini", priority: 1 },
+            { provider: "openrouter", model: "google/gemini-2.0-flash-exp:free", priority: 2 }
         ]
     }
 };
