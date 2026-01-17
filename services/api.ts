@@ -204,5 +204,10 @@ export const api = {
         const url = blogKey ? `${API_BASE}/articles?blog_key=${blogKey}` : `${API_BASE}/articles`;
         const res = await fetch(url);
         return res.json();
+    },
+
+    async logout() {
+        const { supabase } = await import('./supabaseClient');
+        return supabase.auth.signOut();
     }
 };

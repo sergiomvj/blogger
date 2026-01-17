@@ -13,11 +13,31 @@ import Media from './screens/Media';
 import NewArticle from './screens/NewArticle';
 import PreArticleReview from './screens/PreArticleReview';
 import Articles from './screens/Articles';
+import Login from './screens/Login';
 import Navigation from './components/Navigation';
+import { supabase } from './services/supabaseClient';
+import { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
   const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.DASHBOARD);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Initial check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Simple Hash-based Router simulation
   useEffect(() => {
@@ -47,6 +67,10 @@ const App: React.FC = () => {
   };
 
   const renderScreen = () => {
+    if (!session) {
+      return <Login onLoginSuccess={() => navigateTo(Screen.DASHBOARD)} />;
+    }
+
     switch (currentScreen) {
       case Screen.DASHBOARD:
         return <Dashboard onNavigate={navigateTo} />;
@@ -77,12 +101,22 @@ const App: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background-dark">
+        <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center animate-pulse">
+          <span className="material-symbols-outlined text-primary text-3xl">edit_note</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen w-full lg:max-w-4xl mx-auto bg-background-dark relative md:border-x border-white/5 shadow-2xl overflow-x-hidden">
       <div className="flex-1 flex flex-col pb-24">
         {renderScreen()}
       </div>
-      <Navigation currentScreen={currentScreen} onNavigate={navigateTo} />
+      {session && <Navigation currentScreen={currentScreen} onNavigate={navigateTo} />}
     </div>
   );
 };

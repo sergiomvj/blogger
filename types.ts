@@ -1,5 +1,6 @@
 
 export enum Screen {
+  LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD',
   QUEUE = 'QUEUE',
   JOB_DETAILS = 'JOB_DETAILS',

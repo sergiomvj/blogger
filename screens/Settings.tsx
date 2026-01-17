@@ -369,31 +369,22 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
 
         <div className="h-px bg-white/5 mx-4 my-2"></div>
 
-        <section className="px-4 pt-4 pb-12">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-4">SEO Integration</h3>
-          <div className="space-y-3">
-            {[
-              { id: 'yoast', label: 'Yoast SEO', desc: 'Generate metadata', icon: 'search', color: 'bg-[#a4286a]', checked: true },
-              { id: 'rankmath', label: 'RankMath', desc: 'Score optimization', icon: 'trending_up', color: 'bg-[#ff3d64]' },
-              { id: 'aio', label: 'All in One SEO', desc: 'Schema markup', icon: 'language', color: 'bg-[#005ae0]' }
-            ].map((seo) => (
-              <div key={seo.id} className="flex items-center justify-between p-4 bg-surface-dark border border-white/5 rounded-xl shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className={`flex items-center justify-center size-10 rounded-lg ${seo.color} text-white`}>
-                    <span className="material-symbols-outlined">{seo.icon}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-white">{seo.label}</span>
-                    <span className="text-[10px] text-slate-400">{seo.desc}</span>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input defaultChecked={seo.checked} className="sr-only peer" type="checkbox" />
-                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                </label>
-              </div>
-            ))}
-          </div>
+        <div className="h-px bg-white/5 mx-4 my-2"></div>
+
+        <section className="px-4 pt-4 pb-20">
+          <button
+            onClick={async () => {
+              const { error } = await api.logout();
+              if (error) alert('Erro ao sair: ' + error.message);
+            }}
+            className="w-full flex items-center justify-center gap-2 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 hover:bg-rose-500/20 transition-all font-bold"
+          >
+            <span className="material-symbols-outlined">logout</span>
+            Sair do Sistema
+          </button>
+          <p className="text-center text-[10px] text-slate-500 mt-4 uppercase tracking-[0.2em]">
+            AutoWriter v1.0.0 • Connected to Supabase
+          </p>
         </section>
       </main>
     </div>
