@@ -44,7 +44,7 @@ export const api = {
     },
 
     async getSettings() {
-        const res = await request('/settings');
+        const res = await request(`/settings?t=${Date.now()}`);
         return res.json();
     },
 
@@ -90,9 +90,11 @@ export const api = {
         return res.json();
     },
 
-    async startBatchFromPreArticles() {
+    async startBatchFromPreArticles(ids?: string[]) {
         const res = await request('/batches/from-pre-articles', {
-            method: 'POST'
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: ids ? JSON.stringify({ ids }) : undefined
         });
         return res.json();
     },
@@ -260,8 +262,10 @@ export const api = {
     },
 
     // Published Articles
-    async getPublishedArticles(blogKey?: string) {
-        const path = blogKey ? `/articles?blog_key=${blogKey}` : `/articles`;
+    async getPublishedArticles(blogKey?: string, status?: string) {
+        let path = `/articles?`;
+        if (blogKey) path += `blog_key=${blogKey}&`;
+        if (status) path += `status=${status}`;
         const res = await request(path);
         return res.json();
     },

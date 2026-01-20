@@ -167,12 +167,12 @@ const Presets: React.FC<PresetsProps> = ({ onNavigate }) => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {(activeTab === 'blog' ? blogStyles : articleStyles).map((item: any) => (
-                            <div key={item.id} className="bg-surface-dark border border-white/5 rounded-3xl p-6 hover:border-primary/30 transition-all group overflow-hidden flex flex-col relative">
+                        {(activeTab === 'blog' ? blogStyles : articleStyles).map((style: any) => (
+                            <div key={style.id} className="bg-surface-dark border border-white/5 rounded-3xl p-6 hover:border-primary/30 transition-all group overflow-hidden flex flex-col relative">
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
-                                        <span className="text-[9px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase">{item.style_key}</span>
-                                        <h3 className="text-lg font-bold mt-1">{item.name}</h3>
+                                        <span className="text-[9px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase">{style.style_key}</span>
+                                        <h3 className="text-lg font-bold mt-1">{style.name}</h3>
                                     </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={() => handleOpenEdit(style)} className="size-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">

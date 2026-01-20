@@ -21,8 +21,9 @@ export const TASK_PROMPTS = {
 Gere um brief semântico.
 O JSON deve conter exatamente estas chaves:
 - "brief": (string) Resumo editorial profundo.
-- "audience": (string) Descrição detalhada do público-alvo.
-- "search_intent": (string: "informational", "commercial", "transactional", "navigational" ou "mixed") Intenção de busca.
+- "audience": (string) Descrição detalhada do público-alvo (persona, dores, desejos).
+- "search_intent": (string) "informational", "commercial", "transactional", "navigational" ou "mixed".
+- "emotional_tone": (string) A emoção principal que o artigo deve despertar (ex: esperança, urgência, curiosidade, segurança).
 
 DADOS:
 Tema: {theme_pt}
@@ -31,23 +32,33 @@ Categoria: {category}
 `,
 
   outline: `
-Gere o outline do artigo baseado no Brief Semântico fornecido.
+Gere um outline editorial robusto e detalhado baseado no Brief Semântico.
+O foco é criar uma estrutura lógica que prenda o leitor do início ao fim.
+
 O JSON deve conter:
-- "title_candidates": (array of strings) 3 a 5 opções de títulos magnéticos.
-- "structure": (array of objects) Cada objeto com "heading" (string) e "level" (int 2 ou 3).
-- "editorial_angle": (string) O ângulo diferencial deste artigo.
+- "title_candidates": (array of strings) 5 opções de títulos magnéticos, de alta conversão (High CTR), usando gatilhos mentais (curiosidade, benefício, urgência), mas sem ser clickbait enganoso.
+- "structure": (array of objects) Estrutura completa de headings. Cada objeto deve ter:
+    - "heading": (string) O texto do H2 ou H3. Use títulos provocativos ou que prometam valor.
+    - "level": (int) 2 ou 3.
+    - "description": (string) Breve nota do que cobrir nesta seção para garantir profundidade.
+- "editorial_angle": (string) O ângulo único (Big Idea) que fará este artigo diferente de tudo que já existe no Google.
+
+REGRA:
+1. Comece com uma Introdução que tenha um "Hook" (gancho) forte.
+2. Termine com uma Conclusão acionável.
+3. Crie seções lógicas que construam o argumento passo a passo.
 
 DADOS:
 Brief: {semantic_brief}
 `,
 
   keyword_plan: `
-Gere um plano de palavras-chave.
+Gere um plano de palavras-chave estratégico.
 JSON:
-- "primary_keyword": (string) A melhor palavra-chave para focar.
-- "secondary_keywords": (array of strings) 3 a 8 palavras secundárias.
-- "lsi_keywords": (array of strings) Termos semanticamente relacionados.
-- "mapping": (array of objects) Seção -> Palavra-chave.
+- "primary_keyword": (string) A palavra-chave "Head Tail" ou "Long Tail" com maior potencial de tráfego qualificado para este tema.
+- "secondary_keywords": (array of strings) 5 a 10 palavras secundárias (LSI) que dão contexto semântico.
+- "lsi_keywords": (array of strings) Perguntas frequentes ou termos relacionados que o Google associa ao tema.
+- "mapping": (array of objects) Sugestão de onde usar cada palavra (ex: "Intro", "H2 específico").
 
 DADOS:
 Outline: {outline}
@@ -55,26 +66,28 @@ Keywords Sugeridas: {existing_seo}
 `,
 
   seo_meta: `
-Gere metadados de SEO altamente otimizados.
-Analise o tema e, se disponível, o conteúdo do artigo para extrair o melhor foco.
+Gere metadados de SEO para máxima taxa de clique (CTR) na SERP.
+O título e a descrição são a "capa do livro" e devem vender o clique.
 
 JSON:
-- "meta_title": (string) Título SEO otimizado (até 60 caracteres).
-- "meta_description": (string) Meta descrição persuasiva (até 160 caracteres).
-- "focus_keyword": (string) A palavra-chave principal identificada ou sugerida.
-- "tags": (array of strings) Lista de tags sugeridas.
+- "meta_title": (string) Título SEO otimizado (50-60 caracteres). Deve conter a palavra-chave principal no início (se natural).
+- "meta_description": (string) Meta descrição persuasiva (150-160 caracteres). Inclua a palavra-chave e um Call-to-Action indireto (ex: "Descubra como...", "Veja aqui...").
+- "focus_keyword": (string) A palavra-chave principal.
+- "tags": (array of strings) 5 a 8 tags relevantes para categorização interna.
 
 DADOS:
 Tema: {theme}
-Conteúdo (se disponível): {content_html}
-Keyword Atual (se disponível): {primary_keyword}
+Conteúdo HTML (parcial ou total): {content_html}
+Keyword Atual: {primary_keyword}
 `,
 
   seo_title: `
-Defina o título final e o slug.
+Escolha o título final mais impactante para o artigo.
+Analise os candidatos e a palavra-chave principal. O título deve ser irresistível.
+
 JSON:
-- "title": (string) O título escolhido.
-- "slug": (string) URL-friendly (apenas letras, números e hífens).
+- "title": (string) O título vencedor. Pode ser um dos candidatos ou uma versão melhorada.
+- "slug": (string) Slug curto e limpo para URL (apenas letras minúsculas, números e hífens). Remova "stop words" (de, para, o, a) se não prejudicar o sentido.
 
 DADOS:
 Keyword Principal: {primary_keyword}
@@ -82,7 +95,9 @@ Candidatos: {title_candidates}
 `,
 
   headings: `
-Otimize os cabeçalhos (headings) para SEO.
+Refine os cabeçalhos (H2, H3) para que sejam escaneáveis e instigantes.
+Evite títulos genéricos como "Introdução" ou "Conclusão" (use variações como "Por que isso importa" ou "Considerações Finais sobre [Tema]").
+
 JSON:
 - "headings": (array of objects) Cada um com "text" e "level".
 
@@ -91,16 +106,58 @@ Outline: {outline}
 `,
 
   article_body: `
-Escreva o corpo do artigo em HTML.
-JSON:
-- "content_html": (string) O HTML completo do artigo (use <p>, <h2>, <h3>, <ul>, <li>, <strong>).
-- "word_count": (int) Contagem final de palavras.
+Você é um redator sênior de revista premium, especialista em storytelling, jornalismo narrativo e escrita envolvente.
+
+Sua missão não é apenas informar, mas:
+- Captar a atenção no primeiro parágrafo
+- Criar ritmo (variação de frases curtas e longas)
+- Gerar curiosidade, contraste e emoção
+- Falar diretamente com o leitor
+- Usar metáforas, exemplos concretos e micro-histórias
+- Evitar tom acadêmico, burocrático ou robótico
+- Nunca soar como texto de IA
+
+Diretrizes obrigatórias:
+1. Abertura com gancho emocional ou provocativo.
+2. Pelo menos uma pergunta retórica a cada 3 parágrafos.
+3. Uso ocasional de frases de impacto (curtas, fortes).
+4. Alternar dados com narrativa humana.
+5. Linguagem clara, viva, sem jargões desnecessários.
+6. Final com reflexão ou chamada que ressoe no leitor.
+7. Usar subtitulos para tornar a leitura mais fluida
+
+Estilo:
+- Jornalismo de revista (The Atlantic / Wired / GQ / National Geographic)
+- Tom confiante, elegante, inteligente, mas acessível
+- Nada de “Em conclusão”, “Neste artigo veremos…”, “De forma geral…”
+
+DADOS DO ARTIGO:
+Tema: {theme}
+Público Alvo: {audience}
+Objetivo Emocional: {emotional_tone}
+Extensão: {word_count} palavras
+Idioma: {language}
+Blog Style: {blog_style}
+
+Diretrizes Gerais:
+1. Estruture o conteúdo com tags HTML semânticas (h2, h3, p, ul, li), mas NÃO inclua a tag <html> ou <body>, apenas o conteúdo do artigo.
+2. Otimize para a palavra-chave foco ({primary_keyword}), usando-a no primeiro parágrafo, em pelo menos um H2 e na conclusão.
+
+Formatação:
+- Use parágrafos curtos (máximo 3-4 linhas).
+- Use listas (bullet points) para facilitar a leitura.
+- Use negrito (<strong>) para destacar termos importantes.
+
+Siga estritamente o objetivo: {objective}
+
+JSON DE RETORNO:
+- "content_html": (string) HTML completo do artigo.
+- "word_count": (int) Contagem de palavras estimada.
 
 DADOS:
-Título: {title}
+Título Final: {title}
 Headings: {headings}
-Keywords: {primary_keyword}, {secondary_keywords}
-Tamanho alvo: {word_count}
+Keywords Integração: Primária ({primary_keyword}), Secundárias ({secondary_keywords})
 `,
 
   tags: `

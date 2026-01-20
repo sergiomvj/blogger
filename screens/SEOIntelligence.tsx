@@ -21,7 +21,12 @@ const SEOIntelligence: React.FC<SEOIntelligenceProps> = ({ onNavigate }) => {
         setLoading(true);
         try {
             const data = await api.getSEOCandidates();
-            setCandidates(data);
+            if (Array.isArray(data)) {
+                setCandidates(data);
+            } else {
+                console.error('Invalid candidates data:', data);
+                setCandidates([]);
+            }
         } catch (err) {
             console.error('Failed to fetch SEO candidates:', err);
         } finally {
@@ -146,8 +151,8 @@ const SEOIntelligence: React.FC<SEOIntelligenceProps> = ({ onNavigate }) => {
                                                 onClick={() => handleRunAnalysis(article)}
                                                 disabled={analyzingId === article.id}
                                                 className={`h-11 px-6 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-3 transition-all active:scale-95 ${analyzingId === article.id
-                                                        ? 'bg-slate-800 text-slate-500'
-                                                        : 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-blue-600 hover:shadow-primary/40'
+                                                    ? 'bg-slate-800 text-slate-500'
+                                                    : 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-blue-600 hover:shadow-primary/40'
                                                     }`}
                                             >
                                                 {analyzingId === article.id ? (
@@ -183,6 +188,89 @@ const SEOIntelligence: React.FC<SEOIntelligenceProps> = ({ onNavigate }) => {
                     )}
                 </div>
             </main>
+
+            {/* SEO Result Modal */}
+            {selectedItem && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
+                    <div className="bg-surface-dark w-full max-w-3xl rounded-[2rem] border border-white/10 overflow-hidden shadow-3xl">
+                        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-black/20">
+                            <div>
+                                <h2 className="text-2xl font-black italic uppercase tracking-tight text-white">Resultado da Análise</h2>
+                                <p className="text-xs text-emerald-400 font-bold uppercase tracking-widest mt-1">Otimização Concluída com Sucesso</p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedItem(null)}
+                                className="size-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-8 max-h-[70vh] overflow-y-auto no-scrollbar space-y-8">
+                            {/* Meta Data Section */}
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Meta Title Sugerido</label>
+                                    <div className="bg-black/40 border border-white/5 rounded-xl p-4 text-sm font-medium text-white shadow-inner">
+                                        {selectedItem.meta_title || selectedItem.title || 'N/A'}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Meta Description</label>
+                                    <div className="bg-black/40 border border-white/5 rounded-xl p-4 text-sm text-slate-300 leading-relaxed shadow-inner">
+                                        {selectedItem.meta_description || 'N/A'}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Focus Keyword</label>
+                                        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-emerald-500 text-lg">key</span>
+                                            <span className="text-sm font-black text-emerald-400">{selectedItem.focus_keyword || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Tags Associadas</label>
+                                        <div className="bg-black/40 border border-white/5 rounded-xl p-4 flex flex-wrap gap-2">
+                                            {selectedItem.tags && Array.isArray(selectedItem.tags) ? (
+                                                selectedItem.tags.map((tag: string, i: number) => (
+                                                    <span key={i} className="px-2 py-1 rounded-lg bg-white/5 text-[10px] font-bold uppercase text-slate-400">{tag}</span>
+                                                ))
+                                            ) : (
+                                                <span className="text-xs text-slate-600 italic">Sem tags</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="h-px bg-white/5"></div>
+
+                            {/* Content Snippet */}
+                            {selectedItem.content_html && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Preview do Conteúdo (Trecho)</label>
+                                    <div className="bg-black/40 border border-white/5 rounded-2xl p-6 text-slate-400 text-sm leading-relaxed max-h-60 overflow-y-auto no-scrollbar font-serif">
+                                        <div dangerouslySetInnerHTML={{ __html: selectedItem.content_html.substring(0, 1000) + '...' }} />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 border-t border-white/5 bg-black/20 flex justify-end">
+                            <button
+                                onClick={() => setSelectedItem(null)}
+                                className="px-8 py-4 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 transition-colors shadow-glow"
+                            >
+                                Fechar Visualização
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

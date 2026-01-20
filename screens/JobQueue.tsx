@@ -252,10 +252,31 @@ const JobQueue: React.FC<JobQueueProps> = ({ onNavigate }) => {
                   <div className="size-8 shrink-0 flex items-center justify-center rounded-lg bg-slate-700/50 text-slate-400">
                     <span className="material-symbols-outlined text-[18px]">{job.icon || 'check_circle'}</span>
                   </div>
-                  <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-medium ${['published', 'Published'].includes(job.status) ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/50 text-slate-400'
-                    }`}>
-                    {job.status}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {/* Allow deleting queued jobs that are stuck */}
+                    {['queued', 'Queued'].includes(job.status) && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm('Excluir este job da fila?')) {
+                            try {
+                              await api.deleteJob(job.id);
+                              fetchJobs();
+                            } catch (err) {
+                              alert('Erro ao excluir job');
+                            }
+                          }
+                        }}
+                        className="size-5 flex items-center justify-center rounded-md bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 active:scale-90 transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[12px]">delete</span>
+                      </button>
+                    )}
+                    <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-medium ${['published', 'Published'].includes(job.status) ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-700/50 text-slate-400'
+                      }`}>
+                      {job.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs font-bold truncate text-white">{job.title || 'Sem Título'}</h3>

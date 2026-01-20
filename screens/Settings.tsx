@@ -2,6 +2,50 @@ import React, { useState, useEffect } from 'react';
 import { Screen } from '../types';
 import { api } from '../services/api';
 
+const DEFAULT_MASTER_PROMPT = `Você é um redator sênior de revista premium, especialista em storytelling, jornalismo narrativo e escrita envolvente.
+
+Sua missão não é apenas informar, mas:
+- Captar a atenção no primeiro parágrafo
+- Criar ritmo (variação de frases curtas e longas)
+- Gerar curiosidade, contraste e emoção
+- Falar diretamente com o leitor
+- Usar metáforas, exemplos concretos e micro-histórias
+- Evitar tom acadêmico, burocrático ou robótico
+- Nunca soar como texto de IA
+
+Diretrizes obrigatórias:
+1. Abertura com gancho emocional ou provocativo.
+2. Pelo menos uma pergunta retórica a cada 3 parágrafos.
+3. Uso ocasional de frases de impacto (curtas, fortes).
+4. Alternar dados com narrativa humana.
+5. Linguagem clara, viva, sem jargões desnecessários.
+6. Final com reflexão ou chamada que ressoe no leitor.
+7. Usar subtitulos para tornar a leitura mais fluida
+
+Estilo:
+- Jornalismo de revista (The Atlantic / Wired / GQ / National Geographic)
+- Tom confiante, elegante, inteligente, mas acessível
+- Nada de “Em conclusão”, “Neste artigo veremos…”, “De forma geral…”
+
+DADOS:
+Tema: {theme}
+Público Alvo: {audience}
+Objetivo Emocional: {emotional_tone}
+Extensão: {word_count} palavras
+Idioma: {language}
+
+Diretrizes Gerais:
+1. Use um tom de voz {blog_style} e adapte-se ao público-alvo.
+2. Estruture o conteúdo com tags HTML semânticas (h2, h3, p, ul, li), mas NÃO inclua a tag <html> ou <body>, apenas o conteúdo do artigo.
+3. Otimize para a palavra-chave foco ({primary_keyword}), usando-a no primeiro parágrafo, em pelo menos um H2 e na conclusão.
+
+Formatação:
+- Use parágrafos curtos (máximo 3-4 linhas).
+- Use listas (bullet points) para facilitar a leitura.
+- Use negrito (<strong>) para destacar termos importantes.
+
+Siga estritamente o objetivo: {objective}`;
+
 interface SettingsProps {
   onNavigate: (screen: Screen) => void;
 }
@@ -40,7 +84,14 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
       ]);
 
       if (settingsData && Object.keys(settingsData).length > 0) {
-        setSettings(prev => ({ ...prev, ...settingsData }));
+        setSettings(prev => ({
+          ...prev,
+          ...settingsData,
+          base_prompt: settingsData.base_prompt || DEFAULT_MASTER_PROMPT
+        }));
+      } else {
+        // If no settings exist yet, init with default prompt
+        setSettings(prev => ({ ...prev, base_prompt: DEFAULT_MASTER_PROMPT }));
       }
 
       setDefaultPrompts(defaults);
@@ -121,7 +172,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
                 className="w-full bg-transparent border-none text-white placeholder-slate-500 text-sm py-3.5 pl-10 pr-20 focus:ring-0"
                 placeholder="Insira a chave de acesso ao dashboard..."
                 type="password"
-                value={settings.dashboard_api_key}
+                value={settings.dashboard_api_key || ''}
                 onChange={(e) => handleInputChange('dashboard_api_key', e.target.value)}
               />
             </div>
@@ -144,7 +195,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
                 className="w-full bg-transparent border-none text-white placeholder-slate-500 text-sm py-3.5 pl-10 pr-20 focus:ring-0"
                 placeholder="sk-..."
                 type={showOpenAI ? 'text' : 'password'}
-                value={settings.openai_api_key}
+                value={settings.openai_api_key || ''}
                 onChange={(e) => handleInputChange('openai_api_key', e.target.value)}
               />
               <div className="absolute right-2 flex items-center space-x-1">
@@ -164,7 +215,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
                 className="w-full bg-transparent border-none text-white placeholder-slate-500 text-sm py-3.5 pl-10 pr-20 focus:ring-0"
                 placeholder="sk-or-..."
                 type={showAnthropic ? 'text' : 'password'}
-                value={settings.openrouter_api_key}
+                value={settings.openrouter_api_key || ''}
                 onChange={(e) => handleInputChange('openrouter_api_key', e.target.value)}
               />
               <div className="absolute right-2 flex items-center space-x-1">
@@ -187,14 +238,33 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
             <span className="text-[10px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded">Master Instructions</span>
           </div>
 
+
+
           <div className="mb-5">
-            <label className="block text-sm font-medium mb-2 text-slate-200">Prompt Base do Sistema</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-slate-200">Prompt Base do Sistema</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleInputChange('base_prompt', DEFAULT_MASTER_PROMPT)}
+                  className="text-[10px] text-primary hover:text-white font-bold uppercase cursor-pointer transition-colors"
+                  title="Restaurar prompt padrão recomendado"
+                >
+                  Restaurar Padrão
+                </button>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(settings.base_prompt || ''); alert('Copiado!'); }}
+                  className="text-[10px] text-slate-500 hover:text-white font-bold uppercase cursor-pointer transition-colors"
+                >
+                  Copiar
+                </button>
+              </div>
+            </div>
             <div className="relative bg-surface-dark rounded-xl border border-white/10 focus-within:border-primary transition-all shadow-sm overflow-hidden">
               <textarea
                 className="w-full bg-transparent border-none text-white text-[13px] p-4 focus:ring-0 font-mono leading-relaxed"
                 rows={12}
                 placeholder="Insira aqui as instruções mestras para a IA..."
-                value={settings.base_prompt}
+                value={settings.base_prompt || ''}
                 onChange={(e) => handleInputChange('base_prompt', e.target.value)}
               />
               <div className="px-4 py-2 bg-black/40 border-t border-white/5">
@@ -398,7 +468,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
                 className="w-full bg-transparent border-none text-white placeholder-slate-500 text-sm py-3.5 pl-10 pr-20 focus:ring-0"
                 placeholder="sk-..."
                 type={showStability ? 'text' : 'password'}
-                value={settings.stability_api_key}
+                value={settings.stability_api_key || ''}
                 onChange={(e) => handleInputChange('stability_api_key', e.target.value)}
               />
               <div className="absolute right-2 flex items-center space-x-1">
