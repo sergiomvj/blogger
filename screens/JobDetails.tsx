@@ -207,9 +207,15 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onNavigate }) => {
               <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Preview: Conteúdo do Artigo</h4>
               <span className="text-[10px] text-primary font-bold">{artifacts.find(a => a.task === 'article_body').json_data.word_count || ''} palavras</span>
             </div>
-            <div className="p-6 text-slate-300 prose prose-invert prose-sm max-w-none prose-headings:text-white prose-p:leading-relaxed overflow-y-auto max-h-[500px] no-scrollbar">
+            <div className="p-8 text-slate-300 prose prose-invert prose-lg max-w-none 
+                prose-headings:text-white prose-p:leading-8 prose-p:mb-6 
+                prose-h2:text-3xl prose-h2:mt-12 prose-h2:mb-6 prose-h2:font-black prose-h2:text-primary-light
+                prose-h3:text-xl prose-h3:mt-10 prose-h3:mb-4 prose-h3:font-bold
+                prose-img:rounded-3xl prose-img:shadow-2xl prose-img:border prose-img:border-white/10 prose-img:my-10
+                prose-li:text-slate-300 prose-ul:my-6
+                bg-surface-darker rounded-b-2xl">
               {artifacts.find(a => a.task === 'images')?.json_data?.top?.url && (
-                <img src={artifacts.find(a => a.task === 'images').json_data.top.url} alt="Top Hero" className="w-full h-48 object-cover rounded-xl mb-4 border border-white/5" />
+                <img src={artifacts.find(a => a.task === 'images').json_data.top.url} alt="Top Hero" className="w-full h-80 object-cover rounded-3xl mb-8 shadow-xl border border-white/10" />
               )}
               <div dangerouslySetInnerHTML={{ __html: artifacts.find(a => a.task === 'article_body').json_data.content_html }}></div>
             </div>

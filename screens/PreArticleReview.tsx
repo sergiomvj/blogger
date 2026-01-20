@@ -22,7 +22,12 @@ const PreArticleReview: React.FC<PreArticleReviewProps> = ({ onNavigate }) => {
     const fetchPreArticles = async () => {
         try {
             const data = await api.getPreArticles();
-            setPreArticles(data);
+            if (Array.isArray(data)) {
+                setPreArticles(data);
+            } else {
+                console.error("API returned non-array for pre-articles:", data);
+                setPreArticles([]);
+            }
             setSelectedIds([]); // Reset selection on refresh
         } catch (error) {
             console.error('Failed to fetch pre-articles:', error);

@@ -55,8 +55,8 @@ const authenticateDashboard = (req, res, next) => {
 };
 
 const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 2000, // Limit each IP to 2000 requests per windowMs (effectively disabled for dev)
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }
@@ -1246,14 +1246,25 @@ async function runJobPipeline(job) {
 
         // Final Step: Publication
         await update('T12', 98);
-        const result = await publishToWP(jobId, job, artifacts, blogData);
-
-        await supabase.from('jobs').update({
-            status: 'published',
-            wp_post_id: result.post_id,
-            wp_post_url: result.post_url,
-            progress: 100
-        }).eq('id', jobId);
+        try {
+            const result = await publishToWP(jobId, job, artifacts, blogData);
+            await supabase.from('jobs').update({
+                status: 'published',
+                wp_post_id: result.post_id,
+                wp_post_url: result.post_url,
+                progress: 100,
+                last_error: null
+            }).eq('id', jobId);
+        } catch (pubErr) {
+            console.warn(`[Publish Warning] Job ${jobId} generation OK, but publish failed: ${pubErr.message}`);
+            // Mark as published so user can access content, but log error
+            await supabase.from('jobs').update({
+                status: 'published',
+                wp_post_url: null,
+                progress: 100,
+                last_error: `Gerado com sucesso, mas falha na publicação WP: ${pubErr.message}`
+            }).eq('id', jobId);
+        }
 
     } catch (error) {
         console.error(`Pipeline Error [${jobId}]:`, error);
