@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS blogs (
     blog_key VARCHAR(50) UNIQUE NOT NULL,
     blog_id BIGINT NOT NULL,
     style_key VARCHAR(50) REFERENCES blog_styles(style_key),
+    architecture VARCHAR(20) DEFAULT 'EXISTING',
     name TEXT,
     site_url TEXT,
     api_url TEXT,
@@ -154,8 +155,9 @@ CREATE TABLE IF NOT EXISTS settings (
     image_mode VARCHAR(50) DEFAULT 'dalle3',
     base_prompt TEXT,
     use_llm_strategy BOOLEAN DEFAULT TRUE,
+    main_provider VARCHAR(50) DEFAULT 'openai',
     provider_openai_enabled BOOLEAN DEFAULT TRUE,
-    provider_anthropic_enabled BOOLEAN DEFAULT TRUE,
+    provider_openrouter_enabled BOOLEAN DEFAULT TRUE,
     provider_google_enabled BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -190,6 +192,7 @@ CREATE TABLE IF NOT EXISTS pre_articles (
     language VARCHAR(10) DEFAULT 'pt',
     seo TEXT,
     status VARCHAR(50) DEFAULT 'pending',
+    processed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -203,12 +206,25 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_blogs_updated_at ON blogs;
 CREATE TRIGGER update_blogs_updated_at BEFORE UPDATE ON blogs FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_batches_updated_at ON batches;
 CREATE TRIGGER update_batches_updated_at BEFORE UPDATE ON batches FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_jobs_updated_at ON jobs;
 CREATE TRIGGER update_jobs_updated_at BEFORE UPDATE ON jobs FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_pricing_profiles_updated_at ON pricing_profiles;
 CREATE TRIGGER update_pricing_profiles_updated_at BEFORE UPDATE ON pricing_profiles FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
 CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_custom_prompts_updated_at ON custom_prompts;
 CREATE TRIGGER update_custom_prompts_updated_at BEFORE UPDATE ON custom_prompts FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_pre_articles_updated_at ON pre_articles;
 CREATE TRIGGER update_pre_articles_updated_at BEFORE UPDATE ON pre_articles FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Helper Functions (RPC) for Stats

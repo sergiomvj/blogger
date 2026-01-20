@@ -51,17 +51,23 @@ JSON:
 
 DADOS:
 Outline: {outline}
+Keywords Sugeridas: {existing_seo}
 `,
 
   seo_meta: `
-Gere metadados de SEO.
+Gere metadados de SEO altamente otimizados.
+Analise o tema e, se disponível, o conteúdo do artigo para extrair o melhor foco.
+
 JSON:
-- "meta_description": (string) Meta descrição persuasiva até 160 caracteres.
-- "focus_keyword": (string) Repita a keyword principal.
+- "meta_title": (string) Título SEO otimizado (até 60 caracteres).
+- "meta_description": (string) Meta descrição persuasiva (até 160 caracteres).
+- "focus_keyword": (string) A palavra-chave principal identificada ou sugerida.
+- "tags": (array of strings) Lista de tags sugeridas.
 
 DADOS:
 Tema: {theme}
-Keyword Principal: {primary_keyword}
+Conteúdo (se disponível): {content_html}
+Keyword Atual (se disponível): {primary_keyword}
 `,
 
   seo_title: `

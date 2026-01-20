@@ -201,6 +201,21 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onNavigate }) => {
           </div>
         </div>
 
+        {artifacts.find(a => a.task === 'article_body') && (
+          <div className="mt-6 rounded-2xl bg-surface-dark border border-white/5 overflow-hidden shadow-xl">
+            <div className="p-4 bg-slate-900 border-b border-white/5 flex items-center justify-between">
+              <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Preview: Conteúdo do Artigo</h4>
+              <span className="text-[10px] text-primary font-bold">{artifacts.find(a => a.task === 'article_body').json_data.word_count || ''} palavras</span>
+            </div>
+            <div className="p-6 text-slate-300 prose prose-invert prose-sm max-w-none prose-headings:text-white prose-p:leading-relaxed overflow-y-auto max-h-[500px] no-scrollbar">
+              {artifacts.find(a => a.task === 'images')?.json_data?.top?.url && (
+                <img src={artifacts.find(a => a.task === 'images').json_data.top.url} alt="Top Hero" className="w-full h-48 object-cover rounded-xl mb-4 border border-white/5" />
+              )}
+              <div dangerouslySetInnerHTML={{ __html: artifacts.find(a => a.task === 'article_body').json_data.content_html }}></div>
+            </div>
+          </div>
+        )}
+
         {job.wp_post_url && (
           <div className="mt-6">
             <a

@@ -7,33 +7,35 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const [recentJobs, setRecentJobs] = useState<Job[]>([
-    { id: '204', title: 'Lifestyle Network', site: 'Batch #204', category: 'General', status: 'Processing', progress: 45, timestamp: 'Now', icon: 'autorenew' },
-    { id: '4921', title: 'Tech Blog Batch', site: 'tech.site.com', category: 'Tech', status: 'Published', timestamp: '2m ago', icon: 'check_circle' },
-    { id: '4922', title: 'Finance Update', site: 'finance.hub', category: 'Finance', status: 'Queued', timestamp: 'Scheduled', icon: 'schedule' },
-    { id: '4923', title: 'Crypto Daily', site: 'crypto.news', category: 'Crypto', status: 'Failed', timestamp: 'Yesterday', icon: 'error' },
-  ]);
+  const [recentJobs, setRecentJobs] = useState<Job[]>([]);
+  const [blogsCount, setBlogsCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchJobs = async () => {
+    const fetchData = async () => {
       try {
-        const data = await api.getJobs();
-        if (data && data.length > 0) {
-          setRecentJobs(data);
+        const [jobsData, blogsData] = await Promise.all([
+          api.getJobs(),
+          api.getBlogs?.()
+        ]);
+        if (Array.isArray(jobsData)) setRecentJobs(jobsData);
+        if (Array.isArray(blogsData)) {
+          setBlogsCount(blogsData.length);
+        } else {
+          setBlogsCount(0);
         }
       } catch (error) {
-        console.error('Failed to fetch jobs:', error);
+        console.error('Failed to fetch dashboard data:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchJobs();
+    fetchData();
   }, []);
 
   const stats: Stat[] = [
     { label: 'Artigos Publicados', value: '1,240', trend: '+5%', icon: 'article', color: 'bg-primary/10 text-primary' },
-    { label: 'Sites Conectados', value: '0', icon: 'language', color: 'bg-blue-500/10 text-blue-500' },
+    { label: 'Sites Conectados', value: blogsCount?.toString() || '0', icon: 'language', color: 'bg-blue-500/10 text-blue-500' },
     { label: 'Fila de Espera', value: '0', icon: 'pending_actions', color: 'bg-amber-500/10 text-amber-500' },
     { label: 'Taxa de Sucesso', value: '100%', icon: 'analytics', color: 'bg-violet-500/10 text-violet-500' },
   ];
@@ -47,8 +49,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <span className="material-symbols-outlined text-primary">edit_note</span>
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-wide uppercase text-primary">AutoWriter</h1>
-            <p className="text-xs text-slate-400 font-medium tracking-tight">Multisite Engine</p>
+            <h1 className="text-sm font-black tracking-[0.2em] uppercase text-primary italic">BLOGGER</h1>
+            <p className="text-[10px] text-slate-500 font-bold tracking-tighter uppercase">Multisite Engine</p>
           </div>
         </div>
         <button onClick={() => onNavigate(Screen.SETTINGS)} className="size-10 flex items-center justify-center rounded-full hover:bg-white/10 text-slate-400 transition-colors">
@@ -64,6 +66,44 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <p className="text-sm font-medium text-slate-400">All systems operational. Network active.</p>
           </div>
         </section>
+
+        {blogsCount === 0 ? (
+          <section className="mb-8 p-8 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent rounded-[2rem] border border-primary/20 relative overflow-hidden group">
+            <div className="absolute -right-12 -top-12 size-64 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition-all duration-700"></div>
+            <div className="relative z-10">
+              <span className="px-3 py-1 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-full">Onboarding Recomended</span>
+              <h3 className="text-2xl font-black italic uppercase tracking-tight mt-4 max-w-xs">Sua Network de Blogs está Vazia</h3>
+              <p className="text-slate-400 text-sm mt-3 leading-relaxed max-w-sm">
+                Para começar a publicar artigos com IA, você precisa conectar seu primeiro blog ou configurar um novo projeto.
+              </p>
+              <button
+                onClick={() => onNavigate(Screen.BLOGS)}
+                className="mt-8 px-8 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-sm shadow-glow hover:scale-105 transition-all active:scale-95 flex items-center gap-3 w-fit"
+              >
+                <span className="material-symbols-outlined">rocket_launch</span>
+                Configurar Primeiro Blog
+              </button>
+            </div>
+          </section>
+        ) : (
+          <section className="mb-8 p-6 bg-surface-dark/50 rounded-3xl border border-white/5 flex items-center justify-between group hover:border-primary/30 transition-all">
+            <div className="flex items-center gap-5">
+              <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-3xl">add_circle</span>
+              </div>
+              <div>
+                <h4 className="font-black italic uppercase tracking-tight text-white">Expandir Network</h4>
+                <p className="text-xs text-slate-500 font-medium">Já tem {blogsCount} sites ativos. Deseja adicionar mais um?</p>
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigate(Screen.BLOGS)}
+              className="px-6 py-2.5 bg-white/5 hover:bg-primary text-white hover:text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+            >
+              Novo Blog
+            </button>
+          </section>
+        )}
 
         <section className="grid grid-cols-2 gap-3 mb-8">
           {stats.map((stat, i) => (
@@ -130,6 +170,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               <div>
                 <p className="font-bold text-violet-500">Meus Artigos</p>
                 <p className="text-xs text-slate-400">Veja todos os artigos publicados e filtre por blog</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onNavigate(Screen.SEO)}
+              className="flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl hover:bg-emerald-500/20 transition-colors text-left"
+            >
+              <div className="size-12 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-white">search_insights</span>
+              </div>
+              <div>
+                <p className="font-bold text-emerald-500">SEO Intelligence</p>
+                <p className="text-xs text-slate-400">Análise semântica e planejamento de keywords estratégico</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onNavigate(Screen.INTEGRATOR)}
+              className="flex items-center gap-4 bg-sky-500/10 border border-sky-500/20 p-4 rounded-xl hover:bg-sky-500/20 transition-colors text-left"
+            >
+              <div className="size-12 rounded-full bg-sky-500 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-white">hub</span>
+              </div>
+              <div>
+                <p className="font-bold text-sky-500">Integrador Hub</p>
+                <p className="text-xs text-slate-400">Gerencie conexões de blogs e auditoria universal da API</p>
               </div>
             </button>
           </div>

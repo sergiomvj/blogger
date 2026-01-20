@@ -92,9 +92,30 @@ const PreArticleReview: React.FC<PreArticleReviewProps> = ({ onNavigate }) => {
                     </button>
                     <h1 className="text-lg font-bold">Revisar Pré-Artigos</h1>
                 </div>
-                <button onClick={() => onNavigate(Screen.NEW_ARTICLE)} className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
-                    <span className="material-symbols-outlined">add</span>
-                </button>
+                <div className="flex items-center gap-2">
+                    {preArticles.length > 0 && preArticles.some(a => !a.processed) && (
+                        <button
+                            onClick={async () => {
+                                if (confirm(`Deseja iniciar a produção de ${preArticles.filter(a => !a.processed).length} artigos?`)) {
+                                    try {
+                                        await api.startBatchFromPreArticles();
+                                        alert('Lote enviado para processamento!');
+                                        fetchPreArticles();
+                                    } catch (err) {
+                                        alert('Erro ao iniciar lote.');
+                                    }
+                                }
+                            }}
+                            className="h-10 px-4 rounded-xl bg-emerald-500 text-white text-xs font-black uppercase tracking-widest shadow-glow-sm hover:bg-emerald-600 transition-all flex items-center gap-2"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">rocket_launch</span>
+                            Produzir Lote
+                        </button>
+                    )}
+                    <button onClick={() => onNavigate(Screen.NEW_ARTICLE)} className="size-10 flex items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors">
+                        <span className="material-symbols-outlined">add</span>
+                    </button>
+                </div>
             </header>
 
             <main className="p-5">
@@ -168,9 +189,14 @@ const PreArticleReview: React.FC<PreArticleReviewProps> = ({ onNavigate }) => {
                                 ) : (
                                     <>
                                         <div className="flex justify-between items-start mb-2">
-                                            <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
-                                                {article.blog_key}
-                                            </span>
+                                            <div className="flex gap-2">
+                                                <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                                                    {article.blog_key}
+                                                </span>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${article.processed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                                                    {article.processed ? 'Processado' : 'Pendente'}
+                                                </span>
+                                            </div>
                                             <div className="flex gap-2">
                                                 <button onClick={() => handleEdit(article)} className="text-slate-400 hover:text-white transition-colors">
                                                     <span className="material-symbols-outlined text-[20px]">edit</span>

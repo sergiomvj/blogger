@@ -37,10 +37,19 @@ export async function callLLM(task, jobId, context) {
     // 2. Filter models based on enabled providers
     models = (models || []).filter(m => {
         if (m.model.startsWith('openai/') && !settingsData.provider_openai_enabled) return false;
-        if (m.model.startsWith('anthropic/') && !settingsData.provider_anthropic_enabled) return false;
+        if (m.provider === 'openrouter' && !settingsData.provider_openrouter_enabled) return false;
         if (m.model.startsWith('google/') && !settingsData.provider_google_enabled) return false;
         return true;
     });
+
+    // 2.5 Prioritize based on main_provider
+    if (settingsData.main_provider) {
+        models.sort((a, b) => {
+            if (a.provider === settingsData.main_provider && b.provider !== settingsData.main_provider) return -1;
+            if (a.provider !== settingsData.main_provider && b.provider === settingsData.main_provider) return 1;
+            return 0; // Maintain priority order within providers
+        });
+    }
 
     if (!models || models.length === 0) {
         throw new Error(`No enabled models configured for task: ${task}`);
@@ -48,7 +57,7 @@ export async function callLLM(task, jobId, context) {
 
     // 3. Apply fallback strategy logic
     if (!settingsData.use_llm_strategy) {
-        models = [models[0]]; // Only use primary
+        models = [models[0]]; // Only use primary (which is now from main_provider if set)
     }
 
     // 4. Fetch Custom Prompt Override

@@ -1,10 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import fs from 'fs';
+import rateLimit from 'express-rate-limit';
 import { supabase } from './services/db.js';
 import { callLLM } from './services/llm.js';
 import { publishToWP, getWPPosts } from './services/wordpress.js';
@@ -23,6 +25,40 @@ const upload = multer({ dest: 'uploads/' });
 
 app.use(cors());
 app.use(express.json());
+
+// --- Security Middleware ---
+const authenticateDashboard = (req, res, next) => {
+    // If we're on local and no key is set, allow (for easier initial dev)
+    const apiKey = process.env.DASHBOARD_API_KEY;
+    if (!apiKey) {
+        console.warn('[SECURITY] DASHBOARD_API_KEY not set. API is unsecured!');
+        return next();
+    }
+
+    const providedKey = req.headers['x-api-key'] || req.query.api_key;
+    if (providedKey === apiKey) {
+        return next();
+    }
+
+    res.status(401).json({ error: 'Unauthorized', message: 'Invalid or missing API Key' });
+};
+
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
+
+// Only protect API routes
+app.use('/api', apiLimiter);
+
+app.use('/api', (req, res, next) => {
+    // Health is public
+    if (req.path === '/health') return next();
+    authenticateDashboard(req, res, next);
+});
 
 const PORT = process.env.PORT || 3000;
 
@@ -154,12 +190,13 @@ app.get('/api/blogs', dbCheck, async (req, res) => {
 });
 
 app.post('/api/blogs', dbCheck, async (req, res) => {
-    const { blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, application_password } = req.body;
+    const { name, blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, application_password, architecture } = req.body;
     try {
         const id = uuidv4();
         const auth = { type: 'application_password', password: application_password };
         const { error } = await supabase.from('blogs').insert({
-            id, blog_key, blog_id, site_url, api_url, hmac_secret,
+            id, name, blog_key, blog_id, site_url, api_url, hmac_secret,
+            architecture: architecture || 'EXISTING',
             style_key: style_key || 'analitica',
             wp_user: wp_user || 'admin',
             auth_credentials: auth
@@ -173,11 +210,11 @@ app.post('/api/blogs', dbCheck, async (req, res) => {
 
 app.put('/api/blogs/:id', dbCheck, async (req, res) => {
     const { id } = req.params;
-    const { blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, application_password } = req.body;
+    const { name, blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, application_password, architecture } = req.body;
     try {
         const auth = { type: 'application_password', password: application_password };
         const { error } = await supabase.from('blogs').update({
-            blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user,
+            name, blog_key, blog_id, site_url, api_url, hmac_secret, style_key, wp_user, architecture,
             auth_credentials: auth
         }).eq('id', id);
         if (error) throw error;
@@ -205,21 +242,34 @@ app.post('/api/blogs/:id/sync', dbCheck, async (req, res) => {
         if (fetchErr || !blog) return res.status(404).json({ error: 'Blog not found' });
 
         const auth = blog.auth_credentials;
-        const basicAuth = Buffer.from(`admin:${auth.password}`).toString('base64');
+        if (!auth?.password) {
+            return res.status(400).json({ error: 'Sync requires Credentials. For custom sites, use the API directly to push metadata.' });
+        }
 
-        const response = await axios.get(`${blog.api_url}/autowriter/v1/discovery`, {
-            headers: { 'Authorization': `Basic ${basicAuth}` }
+        const wpUser = blog.wp_user || 'admin';
+        const basicAuth = Buffer.from(`${wpUser}:${auth.password}`).toString('base64');
+
+        // Determine discovery endpoint based on architecture
+        let discoveryUrl = `${blog.api_url}/autowriter/v1/discovery`;
+        if (blog.architecture === 'NEW') {
+            // For custom blogs, discovery might be directly at the endpoint or /v1/discovery
+            discoveryUrl = blog.api_url.endsWith('/') ? `${blog.api_url}discovery` : `${blog.api_url}/discovery`;
+        }
+
+        // Attempt discovery
+        const response = await axios.get(discoveryUrl, {
+            headers: { 'Authorization': `Basic ${basicAuth}` },
+            timeout: 5000
         });
 
         const discovery = response.data;
-        // Search for the specific blog_id in the multisite response
-        const siteData = discovery.sites.find(s => s.id == blog.blog_id) || discovery.sites[0];
+        const siteData = discovery.sites?.find(s => s.id == blog.blog_id) || discovery.sites?.[0] || discovery;
 
         if (siteData) {
             const { error: updateErr } = await supabase.from('blogs').update({
-                name: siteData.name,
-                categories_json: siteData.categories,
-                authors_json: siteData.authors,
+                name: siteData.name || blog.name,
+                categories_json: siteData.categories || [],
+                authors_json: siteData.authors || [],
                 last_discovery: new Date().toISOString()
             }).eq('id', id);
             if (updateErr) throw updateErr;
@@ -276,8 +326,9 @@ app.get('/api/jobs/:id/cost-estimates', dbCheck, async (req, res) => {
 // --- Style Endpoints ---
 app.get('/api/blog-styles', dbCheck, async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM blog_styles ORDER BY created_at DESC');
-        res.json(rows);
+        const { data, error } = await supabase.from('blog_styles').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        res.json(data);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -287,10 +338,13 @@ app.post('/api/blog-styles', dbCheck, async (req, res) => {
     const { style_key, name, description, tone_of_voice, target_audience, editorial_guidelines, cta_config, forbidden_terms } = req.body;
     try {
         const id = uuidv4();
-        await pool.query(
-            'INSERT INTO blog_styles (id, style_key, name, description, tone_of_voice, target_audience, editorial_guidelines, cta_config, forbidden_terms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [id, style_key, name, description, tone_of_voice, target_audience, JSON.stringify(editorial_guidelines || []), JSON.stringify(cta_config || []), JSON.stringify(forbidden_terms || [])]
-        );
+        const { error } = await supabase.from('blog_styles').insert({
+            id, style_key, name, description, tone_of_voice, target_audience,
+            editorial_guidelines: editorial_guidelines || [],
+            cta_config: cta_config || [],
+            forbidden_terms: forbidden_terms || []
+        });
+        if (error) throw error;
         res.json({ message: 'Style created', id });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -301,10 +355,13 @@ app.put('/api/blog-styles/:id', dbCheck, async (req, res) => {
     const { id } = req.params;
     const { style_key, name, description, tone_of_voice, target_audience, editorial_guidelines, cta_config, forbidden_terms } = req.body;
     try {
-        await pool.query(
-            'UPDATE blog_styles SET style_key = ?, name = ?, description = ?, tone_of_voice = ?, target_audience = ?, editorial_guidelines = ?, cta_config = ?, forbidden_terms = ? WHERE id = ?',
-            [style_key, name, description, tone_of_voice, target_audience, JSON.stringify(editorial_guidelines || []), JSON.stringify(cta_config || []), JSON.stringify(forbidden_terms || []), id]
-        );
+        const { error } = await supabase.from('blog_styles').update({
+            style_key, name, description, tone_of_voice, target_audience,
+            editorial_guidelines: editorial_guidelines || [],
+            cta_config: cta_config || [],
+            forbidden_terms: forbidden_terms || []
+        }).eq('id', id);
+        if (error) throw error;
         res.json({ message: 'Style updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -381,6 +438,182 @@ app.get('/api/media', dbCheck, async (req, res) => {
     }
 });
 
+app.post('/api/media/purge', dbCheck, async (req, res) => {
+    try {
+        const mediaDir = path.join(__dirname, 'media');
+        if (!fs.existsSync(mediaDir)) return res.json({ message: 'No media directory found' });
+
+        const { data: assets } = await supabase.from('media_assets').select('url');
+        const usedFiles = new Set(assets?.map(a => path.basename(a.url)) || []);
+
+        const files = fs.readdirSync(mediaDir);
+        let deletedCount = 0;
+        files.forEach(file => {
+            if (!usedFiles.has(file) && file.endsWith('.png')) {
+                fs.unlinkSync(path.join(mediaDir, file));
+                deletedCount++;
+            }
+        });
+
+        res.json({ message: `Purged ${deletedCount} unused media files` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- SEO Intelligence ---
+app.get('/api/seo/candidates', dbCheck, async (req, res) => {
+    try {
+        // 1. Fetch pre-articles
+        const { data: pre, error: preErr } = await supabase.from('pre_articles').select('id, theme, blog_key, category, seo, created_at, status');
+        if (preErr) throw preErr;
+
+        // 2. Fetch jobs
+        const { data: jobs, error: jobErr } = await supabase.from('jobs').select('id, job_key, blog_key, category, status, wp_post_id, wp_post_url, created_at, theme_pt');
+        if (jobErr) throw jobErr;
+
+        const candidates = [
+            ...pre.map(p => ({
+                id: p.id,
+                source: 'pre',
+                title: p.theme,
+                blog_key: p.blog_key,
+                category: p.category,
+                status: 'pre_article',
+                is_published: false,
+                created_at: p.created_at,
+                seo: p.seo
+            })),
+            ...jobs.map(j => ({
+                id: j.id,
+                source: 'job',
+                title: j.theme_pt || j.job_key,
+                blog_key: j.blog_key,
+                category: j.category,
+                status: j.status,
+                is_published: !!j.wp_post_id,
+                wp_url: j.wp_post_url,
+                created_at: j.created_at
+            }))
+        ];
+
+        res.json(candidates.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/seo/analyze', dbCheck, async (req, res) => {
+    const { id, source } = req.body;
+    try {
+        if (source === 'pre') {
+            const { data: article } = await supabase.from('pre_articles').select('*').eq('id', id).single();
+            if (!article) return res.status(404).json({ error: 'Pre-article not found' });
+
+            // Generate SEO keywords using LLM
+            const analysis = await callLLM('keyword_suggestion', id, {
+                theme: article.theme,
+                objective: article.objective,
+                language: article.language || 'pt'
+            });
+
+            const keywords = analysis.keywords || '';
+            await supabase.from('pre_articles').update({ seo: keywords }).eq('id', id);
+
+            return res.json({ success: true, keywords });
+        } else {
+            const { data: job } = await supabase.from('jobs').select('*').eq('id', id).single();
+            if (!job) return res.status(404).json({ error: 'Job not found' });
+
+            // Fetch current artifacts
+            const { data: arts } = await supabase.from('job_artifacts').select('*').eq('job_id', id);
+            const content = arts.find(a => a.task === 'article_body')?.json_data?.content_html || '';
+
+            // Run SEO meta analysis
+            const seoData = await callLLM('seo_meta', id, {
+                theme: job.theme_pt,
+                content_html: content,
+                language: job.language_target,
+                primary_keyword: arts.find(a => a.task === 'keyword_plan')?.json_data?.primary_keyword || ''
+            });
+
+            // Overwrite or create seo_meta artifact
+            await saveArtifact(id, 'seo_meta', seoData);
+
+            // If published, sync back to blog (Override)
+            if (job.status === 'published' && job.wp_post_id) {
+                const { data: blog } = await supabase.from('blogs').select('*').eq('blog_key', job.blog_key).single();
+                if (blog) {
+                    // Map results back for publishToWP expectations
+                    const updatedArtifacts = {
+                        article_body: { content_html: content },
+                        seo_meta: seoData,
+                        seo_title: { title: seoData.meta_title || job.theme_pt, slug: job.job_key },
+                        tags: { tags: seoData.tags || [] }
+                    };
+                    await publishToWP(id, job, updatedArtifacts, blog);
+                }
+            }
+
+            return res.json({ success: true, data: seoData });
+        }
+    } catch (err) {
+        console.error('SEO Analysis error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/seo/projects', dbCheck, async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('seo_projects').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/seo/projects/:id/articles', dbCheck, async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('seo_articles').select('*').eq('project_id', req.params.id).order('created_at', { ascending: false });
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/seo/articles', dbCheck, async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('seo_articles').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Integrator Hub ---
+app.get('/api/integrator/tenants', dbCheck, async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('tenants').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/integrator/events', dbCheck, async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('integration_events').select('*').order('created_at', { ascending: false }).limit(50);
+        if (error) throw error;
+        res.json(data || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/prompts', dbCheck, async (req, res) => {
     try {
         const { data, error } = await supabase.from('custom_prompts').select('*');
@@ -440,8 +673,9 @@ app.delete('/api/jobs/:id', dbCheck, async (req, res) => {
 
 app.post('/api/jobs/:id/retry', dbCheck, async (req, res) => {
     try {
-        await pool.query('UPDATE jobs SET status = \'queued\', last_error = NULL WHERE id = ?', [req.params.id]);
-        processNextInQueue();
+        const { error } = await supabase.from('jobs').update({ status: 'queued', last_error: null }).eq('id', req.params.id);
+        if (error) throw error;
+        triggerQueueProcessor();
         res.json({ message: 'Job retrying' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -530,6 +764,12 @@ app.get('/api/articles', dbCheck, async (req, res) => {
     }
 });
 
+// --- Utils ---
+const sanitize = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    return str.trim().replace(/<[^>]*>?/gm, '').substring(0, 5000);
+};
+
 app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -547,44 +787,122 @@ app.post('/api/upload', [dbCheck, upload.single('csv')], async (req, res) => {
         });
         if (batchErr) throw batchErr;
 
-        for (const record of records) {
-            const metadata = {
-                tags: record.tags || '',
-                tone: record.tone || '',
-                cta: record.cta || '',
-                sources: record.sources || '',
-                featured_image_url: record.featured_image_url || '',
-                top_image_url: record.top_image_url || '',
-                featured_image_alt: record.featured_image_alt || '',
-                top_image_alt: record.top_image_alt || '',
-                seo: record.seo || ''
-            };
+        // For cada record, inserimos no banco com status 'queued'
+        // O processador de background vai pegar esses jobs automaticamente
+        const jobsToInsert = records.map(record => {
+            const theme = sanitize(record.theme || 'Untitled Theme');
+            const style = sanitize(record.article_style || record.style || 'analitica');
 
-            const theme = record.theme || 'Untitled Theme';
-            const style = record.article_style || record.style || 'analitica';
-
-            const { error: jobErr } = await supabase.from('jobs').insert({
+            return {
                 id: uuidv4(),
                 batch_id: batchId,
                 job_key: theme.substring(0, 100),
                 idempotency_key: uuidv4(),
-                blog_key: record.blog || 'default',
+                blog_key: sanitize(record.blog || 'default'),
                 blog_id: parseInt(record.blog_id_override) || 1,
-                category: record.category || 'Geral',
+                category: sanitize(record.category || 'Geral'),
                 article_style_key: style,
-                objective_pt: record.objective || '',
+                objective_pt: sanitize(record.objective || ''),
                 theme_pt: theme,
-                language_target: record.language || 'pt',
+                language_target: sanitize(record.language || 'pt'),
                 word_count: parseInt(record.word_count) || 1000,
-                metadata: metadata
-            });
-            if (jobErr) console.error('Error inserting job from CSV:', jobErr);
+                status: 'queued',
+                metadata: {
+                    tags: sanitize(record.tags || ''),
+                    tone: sanitize(record.tone || ''),
+                    cta: sanitize(record.cta || ''),
+                    sources: sanitize(record.sources || ''),
+                    featured_image_url: sanitize(record.featured_image_url || ''),
+                    top_image_url: sanitize(record.top_image_url || ''),
+                    featured_image_alt: sanitize(record.featured_image_alt || ''),
+                    top_image_alt: sanitize(record.top_image_alt || ''),
+                    seo: sanitize(record.seo || '')
+                }
+            };
+        });
+
+        const { error: insError } = await supabase.from('jobs').insert(jobsToInsert);
+        if (insError) throw insError;
+
+        // Avisa ao processador para acordar se necessário
+        triggerQueueProcessor();
+
+        res.json({ message: 'Batch queued', batch_id: batchId, count: records.length });
+    } catch (error) {
+        console.error('[CSV UPLOAD ERR]', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/batches/from-pre-articles', dbCheck, async (req, res) => {
+    try {
+        // 1. Fetch all unprocessed pre-articles
+        const { data: preArticles, error: fetchErr } = await supabase
+            .from('pre_articles')
+            .select('*')
+            .eq('processed', false)
+            .eq('status', 'pending');
+
+        if (fetchErr) throw fetchErr;
+
+        if (!preArticles || preArticles.length === 0) {
+            return res.status(400).json({ error: 'No unprocessed pre-articles found' });
         }
 
-        processBatchBackground(batchId);
-        res.json({ message: 'Batch queued', batch_id: batchId });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+        const batchId = uuidv4();
+        const batchName = `Batch Pré-Artigos ${new Date().toLocaleDateString()}`;
+
+        // 2. Create Batch
+        const { error: batchErr } = await supabase.from('batches').insert({
+            id: batchId,
+            name: batchName,
+            status: 'processing'
+        });
+        if (batchErr) throw batchErr;
+
+        // 3. Convert Pre-Articles to Jobs
+        const jobsToInsert = preArticles.map(pa => ({
+            id: uuidv4(),
+            batch_id: batchId,
+            job_key: pa.theme.substring(0, 100),
+            idempotency_key: uuidv4(), // PA ID could be used but we might want multiple jobs from same PA later
+            blog_key: pa.blog_key,
+            blog_id: 1, // Default, can be refined
+            category: pa.category || 'Geral',
+            article_style_key: pa.article_style_key || 'analitica',
+            objective_pt: pa.objective || '',
+            theme_pt: pa.theme,
+            language_target: pa.language || 'pt',
+            word_count: pa.word_count || 1000,
+            status: 'queued',
+            metadata: {
+                seo: pa.seo || ''
+            }
+        }));
+
+        const { error: insError } = await supabase.from('jobs').insert(jobsToInsert);
+        if (insError) throw insError;
+
+        // 4. Mark Pre-Articles as processed
+        const paIds = preArticles.map(pa => pa.id);
+        const { error: updError } = await supabase
+            .from('pre_articles')
+            .update({ processed: true, status: 'converted' })
+            .in('id', paIds);
+
+        if (updError) console.error('[PRE-ARTICLE UPDATE ERR]', updError.message);
+
+        triggerQueueProcessor();
+
+        res.json({
+            message: 'Batch created from pre-articles',
+            batch_id: batchId,
+            count: jobsToInsert.length
+        });
+
+    } catch (err) {
+        console.error('[PRE-ARTICLE BATCH ERR]', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -643,54 +961,82 @@ if (!fs.existsSync(path.join(distPath, 'index.html'))) {
 console.log(`[FILESYSTEM] Mapeando Dashboard em: ${distPath}`);
 app.use(express.static(distPath));
 
-// --- Pipeline Runner ---
-// Usando um semáforo manual para evitar sobrecarregar a API de LLM (max 3 jobs simultâneos)
+// --- Pipeline Runner (Refactored for Persistence) ---
 let activeJobs = 0;
-const jobQueue = [];
+const MAX_CONCURRENT_JOBS = 3;
+let processorTimeout = null;
 
-async function processBatchBackground(batchId) {
-    const { data: jobs } = await supabase.from('jobs').select('*').eq('batch_id', batchId);
-    if (jobs) {
-        for (const job of jobs) {
-            jobQueue.push(job);
-        }
-        processNextInQueue();
-    }
-}
-
-async function checkBatchBudget(batchId) {
-    const { data: batch } = await supabase.from('batches').select('budget_limit').eq('id', batchId).single();
-    const limit = batch?.budget_limit;
-    if (limit === null || limit === undefined) return true;
-
-    const { data: costData } = await supabase.rpc('get_batch_cost', { b_id: batchId });
-    const currentCost = costData?.[0]?.current_cost || 0;
-
-    return currentCost < parseFloat(limit);
+function triggerQueueProcessor() {
+    if (processorTimeout) clearTimeout(processorTimeout);
+    processNextInQueue();
 }
 
 async function processNextInQueue() {
-    if (activeJobs >= 3 || jobQueue.length === 0) return;
-
-    const job = jobQueue[0]; // Espia o próximo
-    const isWithinBudget = await checkBatchBudget(job.batch_id);
-
-    if (!isWithinBudget) {
-        console.log(`[BUDGET] Limite de gastos atingido para o batch ${job.batch_id}. Pausando jobs deste batch.`);
-        await supabase.from('batches').update({ status: 'budget_exceeded' }).eq('id', job.batch_id);
+    if (activeJobs >= MAX_CONCURRENT_JOBS) {
+        // Full, processor will be triggered when a job finishes
         return;
     }
 
-    jobQueue.shift(); // Remove de fato
-    activeJobs++;
+    try {
+        // Fetch oldest queued job
+        const { data: jobs, error } = await supabase
+            .from('jobs')
+            .select('*')
+            .eq('status', 'queued')
+            .order('created_at', { ascending: true })
+            .limit(1);
 
-    runJobPipeline(job).finally(() => {
-        activeJobs--;
-        processNextInQueue();
-    });
+        if (error) throw error;
 
-    // Tenta rodar outro se houver slots
-    processNextInQueue();
+        if (!jobs || jobs.length === 0) {
+            // Idle. Check again in 30 seconds if nothing triggers it
+            processorTimeout = setTimeout(processNextInQueue, 30000);
+            return;
+        }
+
+        const job = jobs[0];
+
+        // 1. Double check budget
+        const isWithinBudget = await checkBatchBudget(job.batch_id);
+        if (!isWithinBudget) {
+            console.log(`[BUDGET] Limit exceeded for batch ${job.batch_id}. Skipping job ${job.id}.`);
+            await supabase.from('batches').update({ status: 'budget_exceeded' }).eq('id', job.batch_id);
+            await supabase.from('jobs').update({ status: 'failed', last_error: 'Budget exceeded' }).eq('id', job.id);
+            // Move to next job immediately
+            return processNextInQueue();
+        }
+
+        // 2. Claim job (pessimistic lock via status update)
+        const { data: claimedJob, error: claimErr } = await supabase
+            .from('jobs')
+            .update({ status: 'processing', attempts: (job.attempts || 0) + 1 })
+            .eq('id', job.id)
+            .eq('status', 'queued') // Ensure no one else took it
+            .select();
+
+        if (claimErr || !claimedJob || claimedJob.length === 0) {
+            // Probably someone else took it or it's gone
+            return processNextInQueue();
+        }
+
+        // 3. Run
+        activeJobs++;
+        console.log(`[PIPELINE] Starting job ${job.id} (${activeJobs}/${MAX_CONCURRENT_JOBS})`);
+
+        runJobPipeline(claimedJob[0]).finally(() => {
+            activeJobs--;
+            processNextInQueue();
+        });
+
+        // 4. If we have more slots, grab another
+        if (activeJobs < MAX_CONCURRENT_JOBS) {
+            processNextInQueue();
+        }
+
+    } catch (err) {
+        console.error('[PROCESSOR ERR]', err.message);
+        processorTimeout = setTimeout(processNextInQueue, 10000);
+    }
 }
 
 async function runJobPipeline(job) {
@@ -725,7 +1071,8 @@ async function runJobPipeline(job) {
         ...job,
         language: job.language_target,
         blog_style: blogStyle,
-        article_style: articleStyle
+        article_style: articleStyle,
+        existing_seo: job.metadata?.seo || ''
     };
 
     try {
@@ -887,13 +1234,20 @@ function runHardQualityChecks(html, job, blacklist = []) {
 }
 
 async function saveArtifact(jobId, task, data) {
-    await supabase.from('job_artifacts').insert({
-        id: uuidv4(),
-        job_id: jobId,
-        revision: 1,
-        task: task,
-        json_data: data
-    });
+    try {
+        const { error } = await supabase.from('job_artifacts').upsert({
+            job_id: jobId,
+            revision: 1,
+            task: task,
+            json_data: data,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: 'job_id,revision,task'
+        });
+        if (error) throw error;
+    } catch (err) {
+        console.error(`[Artifact Error] Failed to save ${task} for ${jobId}:`, err.message);
+    }
 }
 
 // Rota para qualquer outra coisa (SPA Routing)
@@ -923,12 +1277,28 @@ app.listen(PORT, '0.0.0.0', async () => {
     // Cleanup: Reset jobs that were 'processing' when server shut down
     try {
         const { error } = await supabase.from('jobs').update({
-            status: 'failed',
-            last_error: 'Servidor reiniciado durante o processamento'
+            status: 'queued', // Back to queued to retry
+            last_error: 'Servidor reiniciado'
         }).eq('status', 'processing');
 
         if (error) throw error;
     } catch (err) {
         console.error('[CLEANUP ERR]', err.message);
     }
+
+    // Start processing
+    triggerQueueProcessor();
+});
+
+// --- Graceful Shutdown ---
+process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    if (processorTimeout) clearTimeout(processorTimeout);
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT signal received: closing HTTP server');
+    if (processorTimeout) clearTimeout(processorTimeout);
+    process.exit(0);
 });

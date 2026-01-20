@@ -12,15 +12,17 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
   const [showStability, setShowStability] = useState(false);
 
   const [settings, setSettings] = useState({
-    openai_api_key: 'sk-8j9sfd89sfd789...',
-    anthropic_api_key: '',
-    stability_api_key: 'sk-stability-key-123',
+    openai_api_key: '',
+    openrouter_api_key: '',
+    stability_api_key: '',
     image_mode: 'dalle3',
     base_prompt: '',
     use_llm_strategy: true,
     provider_openai_enabled: true,
-    provider_anthropic_enabled: true,
+    provider_openrouter_enabled: true,
     provider_google_enabled: true,
+    main_provider: 'openai',
+    dashboard_api_key: localStorage.getItem('autowriter_api_key') || '',
   });
   const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [defaultPrompts, setDefaultPrompts] = useState<Record<string, string>>({});
@@ -66,11 +68,13 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
       alert('Erro ao salvar prompt');
     }
   };
-
   const handleSave = async () => {
     setSaving(true);
     try {
       await api.updateSettings(settings);
+      if (settings.dashboard_api_key) {
+        localStorage.setItem('autowriter_api_key', settings.dashboard_api_key);
+      }
       alert('Settings saved successfully!');
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -108,6 +112,28 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
 
       <main className="flex-1 overflow-y-auto no-scrollbar pb-32">
         <section className="px-4 pt-6">
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-4">Segurança Central</h3>
+          <div className="mb-5">
+            <label className="block text-sm font-medium mb-2 text-slate-200">Dashboard API Key</label>
+            <div className="relative flex items-center bg-surface-dark rounded-xl border border-white/10 focus-within:border-primary transition-all shadow-sm">
+              <span className="material-symbols-outlined absolute left-3 text-slate-500" style={{ fontSize: '20px' }}>shield</span>
+              <input
+                className="w-full bg-transparent border-none text-white placeholder-slate-500 text-sm py-3.5 pl-10 pr-20 focus:ring-0"
+                placeholder="Insira a chave de acesso ao dashboard..."
+                type="password"
+                value={settings.dashboard_api_key}
+                onChange={(e) => handleInputChange('dashboard_api_key', e.target.value)}
+              />
+            </div>
+            <p className="text-[10px] text-slate-500 mt-2">
+              Esta chave deve coincidir com a variável <code className="text-primary">DASHBOARD_API_KEY</code> no seu arquivo <code className="text-slate-400">.env</code> do backend.
+            </p>
+          </div>
+        </section>
+
+        <div className="h-px bg-white/5 mx-4 my-2"></div>
+
+        <section className="px-4 pt-6">
           <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-4">Text Generation</h3>
 
           <div className="mb-5">
@@ -131,15 +157,15 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
           </div>
 
           <div className="mb-5">
-            <label className="block text-sm font-medium mb-2 text-slate-200">Anthropic API Key</label>
+            <label className="block text-sm font-medium mb-2 text-slate-200">OpenRouter API Key</label>
             <div className="relative flex items-center bg-surface-dark rounded-xl border border-white/10 focus-within:border-primary transition-all shadow-sm">
               <span className="material-symbols-outlined absolute left-3 text-slate-500" style={{ fontSize: '20px' }}>neurology</span>
               <input
                 className="w-full bg-transparent border-none text-white placeholder-slate-500 text-sm py-3.5 pl-10 pr-20 focus:ring-0"
-                placeholder="sk-ant-..."
+                placeholder="sk-or-..."
                 type={showAnthropic ? 'text' : 'password'}
-                value={settings.anthropic_api_key}
-                onChange={(e) => handleInputChange('anthropic_api_key', e.target.value)}
+                value={settings.openrouter_api_key}
+                onChange={(e) => handleInputChange('openrouter_api_key', e.target.value)}
               />
               <div className="absolute right-2 flex items-center space-x-1">
                 <button className="p-1.5 text-slate-500 hover:text-primary"><span className="material-symbols-outlined text-[20px]">content_paste</span></button>
@@ -298,11 +324,29 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
 
             <div className="h-px bg-white/5 my-4"></div>
 
+            <p className="text-[10px] font-bold text-slate-500 uppercase mb-3">Provedor Principal</p>
+            <div className="flex gap-2 p-1 bg-black/20 rounded-xl border border-white/5 mb-4">
+              <button
+                onClick={() => handleInputChange('main_provider', 'openai')}
+                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${settings.main_provider === 'openai' ? 'bg-primary text-white shadow-glow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                OpenAI
+              </button>
+              <button
+                onClick={() => handleInputChange('main_provider', 'openrouter')}
+                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${settings.main_provider === 'openrouter' ? 'bg-primary text-white shadow-glow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                OpenRouter
+              </button>
+            </div>
+
+            <div className="h-px bg-white/5 my-4"></div>
+
             <p className="text-[10px] font-bold text-slate-500 uppercase mb-3">Provedores Habilitados</p>
             <div className="grid grid-cols-1 gap-3">
               {[
                 { id: 'provider_openai_enabled', label: 'OpenAI (GPT-4o, etc)', icon: 'bolt' },
-                { id: 'provider_anthropic_enabled', label: 'Anthropic (Claude)', icon: 'auto_awesome' },
+                { id: 'provider_openrouter_enabled', label: 'OpenRouter (Mistral, etc)', icon: 'auto_awesome' },
                 { id: 'provider_google_enabled', label: 'Google (Gemini)', icon: 'google' }
               ].map((prov) => (
                 <div key={prov.id} className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5">
@@ -383,7 +427,7 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
             Sair do Sistema
           </button>
           <p className="text-center text-[10px] text-slate-500 mt-4 uppercase tracking-[0.2em]">
-            AutoWriter v1.0.0 • Connected to Supabase
+            BLOGGER v1.0.0 • Connected to Supabase
           </p>
         </section>
       </main>

@@ -42,6 +42,7 @@ export async function publishToWP(jobId, jobData, artifacts, blogCredentials = n
         external_job_id: jobId,
         idempotency_key: jobData.idempotency_key,
         blog_id: jobData.blog_id,
+        wp_post_id: jobData.wp_post_id, // Added this to support updates/overrides
         post: {
             title: artifacts.seo_title?.title || artifacts.outline?.title_candidates?.[0] || jobData.job_key,
             slug: artifacts.seo_title?.slug || '',
@@ -56,7 +57,7 @@ export async function publishToWP(jobId, jobData, artifacts, blogCredentials = n
         },
         seo: {
             meta_description: artifacts.seo_meta?.meta_description || '',
-            focus_keyword: artifacts.keyword_plan?.primary_keyword || '',
+            focus_keyword: artifacts.seo_meta?.focus_keyword || artifacts.keyword_plan?.primary_keyword || '',
             meta_title: artifacts.seo_title?.title || ''
         }
     };
@@ -72,7 +73,13 @@ export async function publishToWP(jobId, jobData, artifacts, blogCredentials = n
     const auth = Buffer.from(`${wpUser}:${wpPassword}`).toString('base64');
 
     try {
-        const response = await axios.post(`${wpUrl}/autowriter/v1/jobs`, payload, {
+        let endpoint = `${wpUrl}/autowriter/v1/jobs`;
+        if (blogCredentials?.architecture === 'NEW') {
+            // For custom blogs, we use the api_url directly as the base for the articles endpoint
+            endpoint = wpUrl.endsWith('/') ? `${wpUrl}jobs` : `${wpUrl}/jobs`;
+        }
+
+        const response = await axios.post(endpoint, payload, {
             headers: {
                 'Authorization': `Basic ${auth}`,
                 'X-AW-Signature': hmac,
@@ -98,15 +105,19 @@ export async function getWPPosts(blogCredentials) {
     const auth = Buffer.from(`${wpUser}:${wpPassword}`).toString('base64');
 
     try {
-        // Fetch published posts from the standard WP REST API
-        // blogCredentials.api_url is expected to be like https://site.com/wp-json
-        const response = await axios.get(`${wpUrl}/wp/v2/posts?per_page=20&status=publish`, {
+        let endpoint = `${wpUrl}/wp/v2/posts?per_page=20&status=publish`;
+        if (blogCredentials?.architecture === 'NEW') {
+            // Custom blog standard for listing posts
+            endpoint = wpUrl.endsWith('/') ? `${wpUrl}posts?per_page=20` : `${wpUrl}/posts?per_page=20`;
+        }
+
+        const response = await axios.get(endpoint, {
             headers: { 'Authorization': `Basic ${auth}` }
         });
 
         return response.data.map(p => ({
-            title: p.title.rendered,
-            url: p.link
+            title: p.title?.rendered || p.title || 'Untitled',
+            url: p.link || p.url || '#'
         }));
     } catch (error) {
         console.warn(`[WP] Could not fetch posts for ${blogCredentials.blog_key}:`, error.message);

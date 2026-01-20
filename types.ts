@@ -12,7 +12,10 @@ export enum Screen {
   MEDIA = 'MEDIA',
   NEW_ARTICLE = 'NEW_ARTICLE',
   PRE_ARTICLE_REVIEW = 'PRE_ARTICLE_REVIEW',
-  ARTICLES = 'ARTICLES'
+  ARTICLES = 'ARTICLES',
+  REGISTER = 'REGISTER',
+  SEO = 'SEO',
+  INTEGRATOR = 'INTEGRATOR'
 }
 
 export type JobStatus = 'Running' | 'Failed' | 'Needs Review' | 'Published' | 'Queued' | 'Processing' | 'processing' | 'failed' | 'published' | 'queued' | 'review';

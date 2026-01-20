@@ -6,7 +6,7 @@ class AutoWriter_Security {
         $settings = get_site_option('autowriter_settings');
         
         if (empty($settings['hmac_secret'])) {
-            return true; // HMAC not configured, fallback to default auth
+            return new WP_Error('rest_forbidden', 'AutoWriter HMAC secret not configured on this site.', ['status' => 403]);
         }
 
         $timestamp = $request->get_header('X-AW-Timestamp');

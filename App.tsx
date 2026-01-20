@@ -14,7 +14,11 @@ import NewArticle from './screens/NewArticle';
 import PreArticleReview from './screens/PreArticleReview';
 import Articles from './screens/Articles';
 import Login from './screens/Login';
+import Register from './screens/Register';
+import SEOIntelligence from './screens/SEOIntelligence';
+import IntegratorHub from './screens/IntegratorHub';
 import Navigation from './components/Navigation';
+import Sidebar from './components/Sidebar';
 import { supabase } from './services/supabaseClient';
 import { Session } from '@supabase/supabase-js';
 
@@ -43,6 +47,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
+
+      if (!hash || hash === 'undefined') {
+        setCurrentScreen(Screen.DASHBOARD);
+        return;
+      }
+
       if (Object.values(Screen).includes(hash as Screen)) {
         setCurrentScreen(hash as Screen);
       } else if (hash.startsWith('JOB_DETAILS_')) {
@@ -58,7 +68,8 @@ const App: React.FC = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const navigateTo = (screen: Screen, id?: string) => {
+  const navigateTo = (screen: Screen | string, id?: string) => {
+    if (!screen || screen === 'undefined') return;
     if (id) {
       window.location.hash = `${screen}_${id}`;
     } else {
@@ -68,7 +79,7 @@ const App: React.FC = () => {
 
   const renderScreen = () => {
     if (!session) {
-      return <Login onLoginSuccess={() => navigateTo(Screen.DASHBOARD)} />;
+      return <Login onNavigate={navigateTo} onLoginSuccess={() => navigateTo(Screen.DASHBOARD)} />;
     }
 
     switch (currentScreen) {
@@ -96,6 +107,10 @@ const App: React.FC = () => {
         return <PreArticleReview onNavigate={navigateTo} />;
       case Screen.ARTICLES:
         return <Articles onNavigate={navigateTo} />;
+      case Screen.SEO:
+        return <SEOIntelligence onNavigate={navigateTo} />;
+      case Screen.INTEGRATOR:
+        return <IntegratorHub onNavigate={navigateTo} />;
       default:
         return <Dashboard onNavigate={navigateTo} />;
     }
@@ -112,11 +127,20 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen w-full lg:max-w-4xl mx-auto bg-background-dark relative md:border-x border-white/5 shadow-2xl overflow-x-hidden">
-      <div className="flex-1 flex flex-col pb-24">
-        {renderScreen()}
+    <div className="flex min-h-screen bg-background-dark text-white overflow-hidden">
+      {/* Sidebar for Desktop */}
+      {session && <Sidebar currentScreen={currentScreen} onNavigate={navigateTo} />}
+
+      <div className="flex-1 flex flex-col min-h-screen relative overflow-y-auto">
+        <main className={`flex-1 flex flex-col w-full mx-auto ${session ? (currentScreen === Screen.LOGIN ? '' : 'pb-24 lg:pb-0') : ''}`}>
+          <div className={`flex-1 flex flex-col w-full mx-auto ${currentScreen === Screen.LOGIN ? '' : 'max-w-5xl'}`}>
+            {renderScreen()}
+          </div>
+        </main>
+
+        {/* Bottom Tab Bar for Mobile */}
+        {session && <Navigation currentScreen={currentScreen} onNavigate={navigateTo} />}
       </div>
-      {session && <Navigation currentScreen={currentScreen} onNavigate={navigateTo} />}
     </div>
   );
 };

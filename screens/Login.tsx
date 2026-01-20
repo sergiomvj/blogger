@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { Screen } from '../types';
 
 interface LoginProps {
+    onNavigate: (screen: Screen) => void;
     onLoginSuccess: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+const Login: React.FC<LoginProps> = ({ onNavigate, onLoginSuccess }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -42,8 +44,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     <div className="size-16 rounded-2xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center shadow-2xl shadow-primary/20 mb-4 transform hover:scale-105 transition-transform duration-500">
                         <span className="material-symbols-outlined text-white text-3xl">edit_note</span>
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">AutoWriter</h1>
-                    <p className="text-slate-400 font-medium">Multisite Management Dashboard</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2 italic">BLOGGER</h1>
+                    <p className="text-slate-400 font-medium tracking-[0.3em] uppercase text-[10px]">Multisite Hub</p>
                 </div>
 
                 <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 p-8 shadow-2xl relative">
@@ -110,7 +112,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         </button>
                     </form>
 
-                    <footer className="mt-8 text-center pt-6 border-t border-white/5">
+                    <footer className="mt-8 text-center pt-6 border-t border-white/5 space-y-4">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                            Acesso Restrito ao Administrador
+                        </p>
                         <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">
                             Powered by Antigravity AI Engine
                         </p>

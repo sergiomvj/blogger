@@ -35,6 +35,20 @@ const UploadCSV: React.FC<UploadCSVProps> = ({ onNavigate }) => {
     }
   };
 
+  const handlePreArticlesBatch = async () => {
+    setIsUploading(true);
+    try {
+      const response = await api.startBatchFromPreArticles();
+      console.log('Pre-articles batch success:', response);
+      onNavigate(Screen.QUEUE);
+    } catch (error: any) {
+      console.error('Batch creation failed:', error);
+      alert(error.error || 'Falha ao criar lote de pré-artigos. Verifique se existem itens pendentes.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const downloadTemplate = () => {
     const headers = "blog,category,article_style,objective,theme,word_count,language,tags,tone,cta,featured_image_url,top_image_url,featured_image_alt,top_image_alt,sources";
     const example = "pnpmagazine,Fitness,analitico,Gerar leads para consultoria,Treino HIIT para iniciantes,1000,pt,\"hiit;emagrecimento;cardio\",\"moderno;direto\",\"Agende uma avaliação\",,,,";
@@ -54,9 +68,9 @@ const UploadCSV: React.FC<UploadCSVProps> = ({ onNavigate }) => {
     <div className="flex flex-col h-screen bg-background-dark">
       <header className="sticky top-0 z-50 flex items-center justify-between bg-background-dark/95 backdrop-blur-md px-4 py-3 border-b border-white/5">
         <button onClick={() => onNavigate(Screen.DASHBOARD)} className="size-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">
-          <span className="material-symbols-outlined">arrow_back_ios_new</span>
+          <span className="material-symbols-outlined text-white">arrow_back_ios_new</span>
         </button>
-        <h1 className="text-lg font-bold flex-1 text-center pr-10 text-white">Upload CSV</h1>
+        <h1 className="text-lg font-bold flex-1 text-center pr-10 text-white">Start New Batch</h1>
       </header>
 
       <main className="flex-1 overflow-y-auto no-scrollbar">
@@ -68,27 +82,36 @@ const UploadCSV: React.FC<UploadCSVProps> = ({ onNavigate }) => {
         </div>
 
         <div className="px-6 pb-2">
-          <h2 className="text-2xl font-bold pb-2 text-white">Import Article Data</h2>
+          <h2 className="text-2xl font-bold pb-2 text-white italic tracking-tight">Generate All Pending</h2>
           <p className="text-slate-400 text-sm font-normal leading-relaxed">
-            Select a CSV file containing your article topics. Ensure your file is strictly formatted for the AutoWriter engine.
+            Process all unmanaged articles from your pre-article reviews or upload a new metadata file.
           </p>
         </div>
 
-        <div className="px-6 py-6">
-          <label className="group relative flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-white/10 bg-surface-dark px-6 py-10 transition-all hover:border-primary/50 hover:bg-white/5 cursor-pointer">
+        <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={handlePreArticlesBatch}
+            disabled={isUploading}
+            className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-white/10 bg-gradient-to-br from-primary/20 to-violet-600/10 p-8 transition-all hover:bg-primary/20 group active:scale-[0.98]"
+          >
+            <div className="size-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
+              <span className="material-symbols-outlined text-white" style={{ fontSize: '32px' }}>auto_awesome</span>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-black text-white italic">PRE-ARTICLES</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Generate From Reviews</p>
+            </div>
+          </button>
+
+          <label className="group relative flex flex-col items-center justify-center gap-4 rounded-3xl border border-white/10 bg-white/5 p-8 transition-all hover:bg-white/10 cursor-pointer active:scale-[0.98]">
             <input accept=".csv" className="hidden" type="file" onChange={handleFileChange} />
-            <div className={`flex size-14 items-center justify-center rounded-full transition-transform duration-300 ${file ? 'bg-emerald-500/10 text-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'bg-primary/10 text-primary group-hover:scale-110'}`}>
-              <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>{file ? 'check_circle' : 'cloud_upload'}</span>
+            <div className={`size-16 rounded-2xl flex items-center justify-center transition-all ${file ? 'bg-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-slate-800'}`}>
+              <span className="material-symbols-outlined text-white" style={{ fontSize: '32px' }}>{file ? 'check_circle' : 'upload_file'}</span>
             </div>
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-lg font-bold truncate max-w-[200px] text-white">{file ? file.name : 'Tap to browse files'}</p>
-              <p className="text-slate-400 text-xs font-normal">Supports .csv (Max 5MB)</p>
+            <div className="text-center">
+              <p className="text-lg font-black text-white italic truncate max-w-[150px]">{file ? file.name : 'CSV UPLOAD'}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Import External Data</p>
             </div>
-            {!file && (
-              <div className="mt-2 flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-white shadow-glow hover:brightness-110 active:scale-95 transition-all">
-                <span className="text-sm font-bold leading-normal tracking-wide">Select File</span>
-              </div>
-            )}
           </label>
         </div>
 
