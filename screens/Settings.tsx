@@ -75,6 +75,18 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // User Management State
+  const [users, setUsers] = useState<any[]>([]);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [userForm, setUserForm] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'user'
+  });
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
   const fetchData = async () => {
     try {
       const [settingsData, defaults, customs] = await Promise.all([
@@ -105,8 +117,21 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
     }
   };
 
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const usersList = await api.listUsers();
+      setUsers(usersList);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchUsers();
   }, []);
 
   const handleSavePrompt = async () => {
@@ -137,6 +162,76 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setSettings(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleOpenUserModal = (user?: any) => {
+    if (user) {
+      setEditingUser(user);
+      setUserForm({
+        email: user.email || '',
+        password: '',
+        full_name: user.user_metadata?.full_name || '',
+        role: user.user_metadata?.role || 'user'
+      });
+    } else {
+      setEditingUser(null);
+      setUserForm({ email: '', password: '', full_name: '', role: 'user' });
+    }
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = async () => {
+    try {
+      if (editingUser) {
+        // Update existing user
+        await api.updateUser(editingUser.id, {
+          user_metadata: {
+            full_name: userForm.full_name,
+            role: userForm.role
+          }
+        });
+        alert('Usuário atualizado com sucesso!');
+      } else {
+        // Create new user
+        if (!userForm.email || !userForm.password) {
+          alert('Email e senha são obrigatórios!');
+          return;
+        }
+        await api.createUser(userForm.email, userForm.password, {
+          full_name: userForm.full_name,
+          role: userForm.role
+        });
+        alert('Usuário criado com sucesso!');
+      }
+      setShowUserModal(false);
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Failed to save user:', error);
+      alert('Erro ao salvar usuário: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (!confirm(`Tem certeza que deseja deletar o usuário ${email}?`)) return;
+    try {
+      await api.deleteUser(userId);
+      alert('Usuário deletado com sucesso!');
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Failed to delete user:', error);
+      alert('Erro ao deletar usuário: ' + (error.message || 'Erro desconhecido'));
+    }
+  };
+
+  const handleResetPassword = async (email: string) => {
+    if (!confirm(`Enviar email de redefinição de senha para ${email}?`)) return;
+    try {
+      await api.resetUserPassword(email);
+      alert('Email de redefinição enviado com sucesso!');
+    } catch (error: any) {
+      console.error('Failed to reset password:', error);
+      alert('Erro ao enviar email: ' + (error.message || 'Erro desconhecido'));
+    }
   };
 
 
@@ -180,6 +275,83 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
               Esta chave deve coincidir com a variável <code className="text-primary">DASHBOARD_API_KEY</code> no seu arquivo <code className="text-slate-400">.env</code> do backend.
             </p>
           </div>
+        </section>
+
+        <div className="h-px bg-white/5 mx-4 my-2"></div>
+
+        {/* User Management Section */}
+        <section className="px-4 pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Gerenciamento de Usuários</h3>
+            <button
+              onClick={() => handleOpenUserModal()}
+              className="bg-primary/20 hover:bg-primary/30 text-primary px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[16px]">person_add</span>
+              Novo Admin
+            </button>
+          </div>
+
+          {loadingUsers ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between p-4 bg-surface-dark border border-white/5 rounded-xl hover:border-primary/40 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-primary text-[20px]">person</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-white">{user.user_metadata?.full_name || 'Sem nome'}</span>
+                      <span className="text-[10px] text-slate-400">{user.email}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${user.user_metadata?.role === 'admin' ? 'bg-primary/20 text-primary' : 'bg-slate-700 text-slate-300'}`}>
+                          {user.user_metadata?.role || 'user'}
+                        </span>
+                        <span className="text-[9px] text-slate-500">
+                          Criado: {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleResetPassword(user.email)}
+                      className="p-2 text-slate-400 hover:text-amber-500 transition-colors"
+                      title="Redefinir senha"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">lock_reset</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenUserModal(user)}
+                      className="p-2 text-slate-400 hover:text-primary transition-colors"
+                      title="Editar usuário"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user.id, user.email)}
+                      className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                      title="Deletar usuário"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {users.length === 0 && (
+                <div className="text-center py-8 text-slate-500 text-sm">
+                  Nenhum usuário cadastrado
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         <div className="h-px bg-white/5 mx-4 my-2"></div>
@@ -501,6 +673,113 @@ const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
           </p>
         </section>
       </main>
+
+      {/* User Modal */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface-dark w-full max-w-md rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-slate-900/50">
+              <div className="flex flex-col">
+                <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                  {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+                </h3>
+                <p className="text-[10px] text-primary font-bold">
+                  {editingUser ? 'Atualizar informações' : 'Cadastrar novo admin'}
+                </p>
+              </div>
+              <button onClick={() => setShowUserModal(false)} className="size-10 flex items-center justify-center rounded-full hover:bg-white/10 text-slate-400">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+              <div>
+                <label className="block text-sm font-medium mb-2 text-slate-200">Email</label>
+                <input
+                  type="email"
+                  className="w-full bg-black/20 border border-white/10 text-white text-sm rounded-xl py-3 px-4 focus:border-primary focus:ring-1 focus:ring-primary"
+                  placeholder="usuario@exemplo.com"
+                  value={userForm.email}
+                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                  disabled={!!editingUser}
+                />
+                {editingUser && (
+                  <p className="text-[10px] text-slate-500 mt-1">Email não pode ser alterado</p>
+                )}
+              </div>
+
+              {!editingUser && (
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-slate-200">Senha</label>
+                  <input
+                    type="password"
+                    className="w-full bg-black/20 border border-white/10 text-white text-sm rounded-xl py-3 px-4 focus:border-primary focus:ring-1 focus:ring-primary"
+                    placeholder="Mínimo 8 caracteres"
+                    value={userForm.password}
+                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Senha temporária (usuário deve alterar no primeiro login)</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-slate-200">Nome Completo</label>
+                <input
+                  type="text"
+                  className="w-full bg-black/20 border border-white/10 text-white text-sm rounded-xl py-3 px-4 focus:border-primary focus:ring-1 focus:ring-primary"
+                  placeholder="Nome do usuário"
+                  value={userForm.full_name}
+                  onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2 text-slate-200">Permissão</label>
+                <div className="flex gap-2 p-1 bg-black/20 rounded-xl border border-white/5">
+                  <button
+                    onClick={() => setUserForm({ ...userForm, role: 'admin' })}
+                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${userForm.role === 'admin' ? 'bg-primary text-white shadow-glow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    Admin
+                  </button>
+                  <button
+                    onClick={() => setUserForm({ ...userForm, role: 'user' })}
+                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${userForm.role === 'user' ? 'bg-primary text-white shadow-glow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    User
+                  </button>
+                </div>
+              </div>
+
+              {editingUser && (
+                <div className="bg-amber-500/5 p-4 rounded-xl border border-amber-500/10 flex items-start gap-3">
+                  <span className="material-symbols-outlined text-amber-500 text-[20px]">info</span>
+                  <div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Para alterar a senha, use o botão "Redefinir Senha" na lista de usuários.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-900/50 border-t border-white/5 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setShowUserModal(false)}
+                className="px-6 py-2 text-slate-400 text-xs font-bold hover:text-white"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveUser}
+                className="px-8 py-2 bg-primary text-white rounded-xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-blue-600 transition-all"
+              >
+                {editingUser ? 'Salvar Alterações' : 'Criar Usuário'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

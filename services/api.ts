@@ -336,5 +336,46 @@ export const api = {
     async getIntegrationEvents() {
         const res = await request('/integrator/events');
         return res.json();
+    },
+
+    // User Management
+    async listUsers() {
+        const { supabaseAdmin } = await import('./supabaseClient');
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+        if (error) throw error;
+        return data.users;
+    },
+
+    async createUser(email: string, password: string, metadata?: any) {
+        const { supabaseAdmin } = await import('./supabaseClient');
+        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: metadata || {}
+        });
+        if (error) throw error;
+        return data.user;
+    },
+
+    async updateUser(userId: string, updates: any) {
+        const { supabaseAdmin } = await import('./supabaseClient');
+        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, updates);
+        if (error) throw error;
+        return data.user;
+    },
+
+    async deleteUser(userId: string) {
+        const { supabaseAdmin } = await import('./supabaseClient');
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (error) throw error;
+        return { success: true };
+    },
+
+    async resetUserPassword(email: string) {
+        const { supabase } = await import('./supabaseClient');
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) throw error;
+        return { success: true };
     }
 };
